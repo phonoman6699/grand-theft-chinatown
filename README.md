@@ -1,5 +1,5 @@
-# GRAND THEFT CHINATOWN
+# Grand Theft Chinatown
 
-Gioco nel browser.
+Gioco nel browser. Dopo il push su `main`, GitLab Pages lo pubblica.
 
-Il sito è pubblicato da GitHub Pages. Il codice del gioco è nel repository GitLab pubblico usato dalla pipeline.
+Il link è `https://dimitriadis.id.gitlab.io/grand-theft-chinatown`.
