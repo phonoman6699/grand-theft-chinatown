@@ -35,14 +35,34 @@ export type Poop = {
   life: number;
 };
 
+export type Gallery = { id: number; x: number; w: number };
+
 export type Bird = {
   id: number;
   x: number;
-  w: number;
   y: number;
-  cool: number;
-  next: number;
-  on: boolean;
+  stopX: number;
+  vx: number;
+  dropped: boolean;
+  hold: number;
+  fly: number;
+  live: boolean;
+};
+
+export type Captain = {
+  id: number;
+  x: number;
+  phase: "idle" | "call" | "throw" | "done";
+  t: number;
+};
+
+export type Glass = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
 };
 
 export type Drop = {
@@ -75,8 +95,11 @@ export type Sim = {
   puddles: Puddle[];
   dogs: Dog[];
   platforms: Platform[];
+  galleries: Gallery[];
   poops: Poop[];
   birds: Bird[];
+  captains: Captain[];
+  glasses: Glass[];
   cursor: number;
   nextId: number;
   drops: Drop[];
@@ -89,9 +112,12 @@ export type Sim = {
   pump: "off" | "drink" | "on" | "used";
   drink: number;
   pumpedAt: number;
+  dash: number;
+  dashCool: number;
+  sip: number;
 };
 
-export type Input = { pressed: boolean; held: boolean; creatine?: boolean };
+export type Input = { pressed: boolean; held: boolean; creatine?: boolean; dash?: number };
 
 export function createSim(seed = 1, level: 1 | 2 | 3 = 1): Sim {
   return {
@@ -114,8 +140,11 @@ export function createSim(seed = 1, level: 1 | 2 | 3 = 1): Sim {
     puddles: [],
     dogs: [],
     platforms: [],
+    galleries: [],
     poops: [],
     birds: [],
+    captains: [],
+    glasses: [],
     cursor: 860,
     nextId: 1,
     drops: [],
@@ -128,6 +157,9 @@ export function createSim(seed = 1, level: 1 | 2 | 3 = 1): Sim {
     pump: "off",
     drink: 0,
     pumpedAt: 0,
+    dash: 0,
+    dashCool: 0,
+    sip: 0,
   };
 }
 
@@ -159,13 +191,23 @@ function pushDrop(sim: Sim, x: number, y: number, vx: number, vy: number, life: 
   sim.drops.push({ x, y, vx, vy, life, max: life, r });
 }
 
-const DECK_H = 16;
-const DROP_AT = [-90, 55, 145, 260];
-
 function spawnAhead(sim: Sim) {
   const horizon = Math.min(sim.x + VIEW_W + 280, FINISH_X - 520);
-  if (sim.level === 2) spawnShelters(sim, horizon);
-  else spawnStreet(sim, horizon);
+  if (sim.level === 2) {
+    if (sim.galleries.length === 0) {
+      sim.galleries.push(
+        { id: sim.nextId++, x: 900, w: 1900 },
+        { id: sim.nextId++, x: 6400, w: 2100 },
+      );
+    }
+    if (sim.captains.length === 0) {
+      sim.captains.push(
+        { id: sim.nextId++, x: 3400, phase: "idle", t: 0 },
+        { id: sim.nextId++, x: 7800, phase: "idle", t: 0 },
+      );
+    }
+    spawnBirds(sim, horizon);
+  } else spawnStreet(sim, horizon);
   const keep = sim.x - 500;
   const cut = sim.puddles.findIndex((p) => p.x + p.w >= keep);
   if (cut > 0) sim.puddles.splice(0, cut);
@@ -173,7 +215,7 @@ function spawnAhead(sim: Sim) {
   sim.dogs = sim.dogs.filter((dog) => dog.x > sim.x - 420);
   sim.platforms = sim.platforms.filter((p) => p.x + p.w > keep);
   sim.poops = sim.poops.filter((p) => p.x > keep && (p.state === "fall" || p.life > 0));
-  sim.birds = sim.birds.filter((b) => b.x + b.w > keep - 200);
+  sim.birds = sim.birds.filter((b) => b.stopX > keep - 200);
 }
 
 function spawnStreet(sim: Sim, horizon: number) {
@@ -204,22 +246,22 @@ function spawnStreet(sim: Sim, horizon: number) {
   }
 }
 
-function spawnShelters(sim: Sim, horizon: number) {
+function spawnBirds(sim: Sim, horizon: number) {
   while (sim.cursor < horizon) {
-    const w = 210;
-    if (sim.cursor + w > FINISH_X - 520) break;
-    sim.platforms.push({ id: sim.nextId++, x: sim.cursor, w });
+    if (sim.cursor > FINISH_X - 640) break;
+    const stopX = sim.cursor + 20;
     sim.birds.push({
       id: sim.nextId++,
-      x: sim.cursor,
-      w,
-      y: GROUND - 270,
-      cool: 0,
-      next: 0,
-      on: false,
+      stopX,
+      x: stopX + 240,
+      y: 14,
+      vx: -460,
+      dropped: false,
+      hold: 0.05,
+      fly: rand(sim) * 6,
+      live: false,
     });
-    const speed = speedAt(sim.cursor);
-    sim.cursor += w + speed * 0.85 + 220;
+    sim.cursor += 680 + rand(sim) * 160;
   }
 }
 
@@ -257,17 +299,6 @@ function killDog(sim: Sim) {
   }
 }
 
-function overDeck(sim: Sim, x: number): Platform | null {
-  for (const p of sim.platforms) {
-    if (x > p.x + 10 && x < p.x + p.w - 10) return p;
-  }
-  return null;
-}
-
-function sheltered(sim: Sim): boolean {
-  return sim.y > GROUND - 24 && overDeck(sim, sim.x) !== null;
-}
-
 function killPoop(sim: Sim) {
   sim.alive = false;
   sim.death = "poop";
@@ -278,41 +309,56 @@ function killPoop(sim: Sim) {
 }
 
 function stepPoops(sim: Sim, dt: number) {
+  const fallG = 980;
+  const fallV = 40;
+  const fallTo = (fromY: number, toY: number) => {
+    let y = fromY;
+    let vy = fallV;
+    let t = 0;
+    const dt = 1 / 60;
+    while (y < toY && t < 3) {
+      vy += fallG * dt;
+      y += vy * dt;
+      t += dt;
+    }
+    return t;
+  };
   for (const bird of sim.birds) {
-    if (bird.next >= DROP_AT.length) continue;
-    const dropX = bird.x + DROP_AT[bird.next];
-    if (!bird.on && sim.x > dropX - 250) bird.on = true;
-    if (!bird.on) continue;
-    bird.cool -= dt;
-    if (bird.cool > 0) continue;
-    sim.poops.push({
-      id: sim.nextId++,
-      x: dropX,
-      y: bird.y,
-      vy: 40,
-      state: "fall",
-      life: 1.6,
-    });
-    bird.next += 1;
-    bird.cool = 0.36;
+    if (!bird.live) {
+      if (sim.x <= bird.stopX - 380) continue;
+      bird.live = true;
+      bird.x = sim.x + 460;
+      bird.hold = 0.5;
+    }
+    if (!bird.dropped) {
+      const fromY = bird.y + 30;
+      const travel = fallTo(fromY, sim.y - 150);
+      const aim = sim.x + Math.max(0, sim.speed) * travel;
+      bird.x += (aim - bird.x) * (1 - Math.exp(-dt * 4.5));
+      if (sim.x > bird.stopX - 60) bird.hold -= dt;
+      if (bird.hold <= 0) {
+        bird.dropped = true;
+        bird.x = aim;
+        sim.poops.push({
+          id: sim.nextId++,
+          x: aim,
+          y: fromY,
+          vy: fallV,
+          state: "fall",
+          life: 2.8,
+        });
+      }
+    }
   }
-  const top = GROUND - DECK;
   for (const poop of sim.poops) {
     if (poop.state !== "fall") {
       poop.life -= dt;
       continue;
     }
-    poop.vy += 1500 * dt;
+    poop.vy += fallG * dt;
     poop.y += poop.vy * dt;
-    const roof = overDeck(sim, poop.x);
-    if (roof && poop.y >= top && poop.y <= top + DECK_H + 8) {
-      poop.y = top;
-      poop.vy = 0;
-      poop.state = "roof";
-      continue;
-    }
-    if (poop.y >= GROUND - 4) {
-      poop.y = GROUND - 4;
+    if (poop.y >= GROUND - 8) {
+      poop.y = GROUND - 8;
       poop.vy = 0;
       poop.state = "stain";
     }
@@ -320,12 +366,15 @@ function stepPoops(sim: Sim, dt: number) {
 }
 
 function hitPoop(sim: Sim): boolean {
-  if (sheltered(sim) || (sim.grounded && sim.y < GROUND - 40)) return false;
-  const top = sim.y - 64;
+  const bodyTop = sim.y - 150;
+  const bodyBot = sim.y - 6;
   for (const poop of sim.poops) {
-    if (poop.state === "roof" || poop.life <= 0) continue;
-    if (poop.x < sim.x - 16 || poop.x > sim.x + 16) continue;
-    if (poop.y >= top && poop.y <= sim.y + 6) return true;
+    if (poop.life <= 0) continue;
+    if (Math.abs(poop.x - sim.x) > 26) continue;
+    if (poop.y < bodyTop || poop.y > bodyBot + 8) continue;
+    const low = poop.y > sim.y - 40;
+    if (low && !sim.grounded) continue;
+    return true;
   }
   return false;
 }
@@ -343,6 +392,56 @@ function kill(sim: Sim, puddle: Puddle) {
     const sp = 80 + (i % 5) * 36;
     pushDrop(sim, splashX, GROUND - 4, Math.cos(a) * sp, Math.sin(a) * sp, 0.45 + (i % 4) * 0.06, 2 + (i % 3));
   }
+}
+
+function stepGlasses(sim: Sim, dt: number) {
+  if (sim.level !== 2) return;
+  for (const captain of sim.captains) {
+    if (captain.phase === "idle") {
+      if (sim.x > captain.x - 520 && sim.x < captain.x - 20) {
+        captain.phase = "call";
+        captain.t = 0.9;
+      }
+      continue;
+    }
+    if (captain.phase === "call") {
+      captain.t -= dt;
+      if (captain.t > 0) continue;
+      captain.phase = "throw";
+      captain.t = 0.55;
+      sim.glasses.push({
+        id: sim.nextId++,
+        x: captain.x - 36,
+        y: GROUND - 96,
+        vx: -460,
+        vy: -280,
+        life: 1.6,
+      });
+      continue;
+    }
+    if (captain.phase === "throw") {
+      captain.t -= dt;
+      if (captain.t <= 0) captain.phase = "done";
+    }
+  }
+  for (const glass of sim.glasses) {
+    glass.life -= dt;
+    glass.vy += 1200 * dt;
+    glass.x += glass.vx * dt;
+    glass.y += glass.vy * dt;
+    if (glass.y >= GROUND - 18) glass.life = 0;
+  }
+  if (sim.sip <= 0) {
+    for (const glass of sim.glasses) {
+      if (glass.life <= 0) continue;
+      if (Math.abs(glass.x - sim.x) > 32) continue;
+      if (glass.y < sim.y - 168 || glass.y > sim.y + 6) continue;
+      sim.sip = 2;
+      glass.life = 0;
+      sim.squash = 0.75;
+    }
+  }
+  sim.glasses = sim.glasses.filter((glass) => glass.life > 0);
 }
 
 export function step(sim: Sim, dt: number, input: Input) {
@@ -365,6 +464,7 @@ export function step(sim: Sim, dt: number, input: Input) {
   }
 
   stepPoops(sim, dt);
+  stepGlasses(sim, dt);
 
   if (sim.won) {
     if (!sim.lit && sim.time - sim.wonAt >= 2.7) {
@@ -400,7 +500,14 @@ export function step(sim: Sim, dt: number, input: Input) {
     sim.squash = 0.8;
   }
 
-  const canJump = sim.grounded || sim.coyote > 0;
+  if (sim.sip > 0) {
+    sim.sip -= dt;
+    sim.buffer = 0;
+    sim.dash = 0;
+  }
+  const drinking = sim.sip > 0;
+
+  const canJump = !drinking && (sim.grounded || sim.coyote > 0);
   if (sim.buffer > 0 && canJump) {
     sim.vy = sim.pump === "on" ? BUFF_JUMP : JUMP_V;
     sim.grounded = false;
@@ -414,27 +521,32 @@ export function step(sim: Sim, dt: number, input: Input) {
     sim.cut = true;
   }
 
-  sim.speed = speedAt(sim.dist);
-  const prevY = sim.y;
+  const cruise = speedAt(Math.max(0, sim.x - 200));
+  sim.speed = drinking ? 0 : cruise;
+  if (!drinking && sim.level === 2) {
+    sim.dashCool = Math.max(0, sim.dashCool - dt);
+    const dash = input.dash ?? 0;
+    if (dash && sim.dashCool <= 0 && sim.dash === 0) {
+      sim.dash = dash * 150;
+      sim.dashCool = 1;
+    }
+  }
   sim.vy += GRAVITY * dt;
   if (sim.vy > 1100) sim.vy = 1100;
   sim.y += sim.vy * dt;
   sim.x += sim.speed * dt;
-  sim.dist += sim.speed * dt;
-
-  const deckTop = GROUND - DECK;
-  const deckUnder = deckTop + DECK_H;
-  if (sim.vy < 0 && prevY >= deckUnder && sim.y < deckUnder && overDeck(sim, sim.x)) {
-    sim.y = deckUnder;
-    sim.vy = 80;
+  if (sim.dash) {
+    const stepDash = Math.sign(sim.dash) * Math.min(Math.abs(sim.dash), 1400 * dt);
+    sim.x += stepDash;
+    sim.dash -= stepDash;
+    if (Math.abs(sim.dash) < 0.5) sim.dash = 0;
   }
+  if (sim.x < 120) sim.x = 120;
+  if (sim.speed > 0) sim.dist += sim.speed * dt;
 
-  let surface = GROUND;
-  if (sim.vy >= 0 && prevY <= deckTop && sim.y >= deckTop && overDeck(sim, sim.x)) surface = deckTop;
-
-  if (sim.y >= surface) {
+  if (sim.y >= GROUND) {
     const landed = !sim.grounded;
-    sim.y = surface;
+    sim.y = GROUND;
     sim.vy = 0;
     sim.grounded = true;
     sim.airTime = 0;

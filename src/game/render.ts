@@ -1,4 +1,4 @@
-import { DECK, FINISH_X, GROUND, VIEW_H, VIEW_W, type Sim } from "@/game/sim";
+import { FINISH_X, GROUND, VIEW_H, VIEW_W, type Sim } from "@/game/sim";
 
 export type Art = {
   run: HTMLImageElement[];
@@ -13,6 +13,12 @@ export type Art = {
   cannelle: HTMLImageElement | null;
   dog: HTMLImageElement | null;
   liberamia: HTMLImageElement | null;
+  cormorant: HTMLImageElement | null;
+  gallery: HTMLImageElement | null;
+  poop: HTMLImageElement | null;
+  captain: HTMLImageElement | null;
+  captainThrow: HTMLImageElement | null;
+  negroni: HTMLImageElement | null;
 };
 
 type House = { x: number; w: number; h: number; roof: number };
@@ -85,6 +91,7 @@ export function drawWorld(
   drawGranSasso(ctx, cam);
   drawFoothills(ctx, cam);
   drawTown(ctx, cam);
+  if (sim.level === 2) drawGalleryBackdrop(ctx, sim, art, cam);
   drawCypresses(ctx, cam);
   drawTower(ctx, 2400 - cam);
   drawBernardino(ctx, 4300 - cam);
@@ -103,7 +110,7 @@ export function drawWorld(
     else drawFountainJets(ctx, FINISH_X + 280 - cam + 70, sim.time);
   }
   drawPortici(ctx, cam);
-  drawCormorants(ctx, sim.time);
+  if (sim.level !== 2) drawCormorants(ctx, sim.time);
 
   drawSampietrini(ctx, cam);
 
@@ -136,7 +143,8 @@ export function drawWorld(
   }
 
   drawDogs(ctx, sim, art, cam);
-  if (sim.level === 2) drawRaid(ctx, sim, cam);
+  if (sim.level === 2) drawBirds(ctx, sim, art, cam);
+  if (sim.level === 2) drawCaptains(ctx, sim, art, cam);
 
   const lift = Math.max(0, GROUND - sim.y);
   ctx.fillStyle = `rgba(0, 0, 0, ${0.28 - Math.min(0.2, lift / 700)})`;
@@ -145,7 +153,8 @@ export function drawWorld(
   ctx.fill();
 
   drawRunner(ctx, sim, art, cam);
-  if (sim.level === 2) drawBeams(ctx, sim, cam);
+  if (sim.level === 2) drawPoops(ctx, sim, art, cam);
+  if (sim.level === 2) drawGlasses(ctx, sim, art, cam);
   drawPump(ctx, sim, cam);
   if (sim.won && art.finale.length < 8) drawSmoke(ctx, sim, cam);
 
@@ -224,65 +233,118 @@ function drawRunner(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: numb
   ctx.restore();
 }
 
-function drawRaid(ctx: CanvasRenderingContext2D, sim: Sim, cam: number) {
-  for (const p of sim.platforms) {
-    const x = p.x - cam;
-    if (x > VIEW_W + 20 || x + p.w < -20) continue;
-    ctx.fillStyle = "#cbbba8";
-    ctx.fillRect(x + 6, GROUND - DECK - 8, 12, DECK - 6);
-    ctx.fillRect(x + p.w - 18, GROUND - DECK - 8, 12, DECK - 6);
+function drawGalleryBackdrop(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
+  for (const gallery of sim.galleries) {
+    const x = gallery.x - cam * 0.36;
+    if (x > VIEW_W + 80 || x + gallery.w < -80) continue;
+    if (art.gallery) ctx.drawImage(art.gallery, x, GROUND - 250, gallery.w, 210);
   }
+}
+
+function drawBirds(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
   for (const bird of sim.birds) {
-    if (bird.next >= 4 && sim.x > bird.x + bird.w + 80) continue;
-    const x = bird.x + bird.w * 0.45 - cam;
-    const y = bird.y + Math.sin(sim.time * 3 + bird.id) * 5;
-    if (x < -80 || x > VIEW_W + 80) continue;
-    drawOneBird(ctx, x, y, Math.sin(sim.time * 12 + bird.id));
+    if (!bird.live) continue;
+    const bob = Math.sin(sim.time * 5 + bird.fly) * 3;
+    const x = bird.x - cam - 30;
+    if (x < -120 || x > VIEW_W + 40) continue;
+    if (art.cormorant) ctx.drawImage(art.cormorant, x, bird.y + bob, 96, 42);
   }
+}
+
+function drawPoops(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
   for (const poop of sim.poops) {
     if (poop.life <= 0) continue;
     const x = poop.x - cam;
-    if (x < -20 || x > VIEW_W + 20) continue;
-    if (poop.state === "fall") {
-      ctx.fillStyle = "rgba(236, 236, 228, 0.8)";
-      ctx.fillRect(x - 1, poop.y - 16, 3, 14);
+    if (x < -40 || x > VIEW_W + 40) continue;
+    const spin = poop.state === "fall" ? Math.sin(sim.time * 10 + poop.id) * 0.35 : 0;
+    ctx.save();
+    ctx.translate(x, poop.y);
+    ctx.rotate(spin);
+    if (art.poop) {
+      const w = poop.state === "fall" ? 46 : 54;
+      const h = poop.state === "fall" ? 70 : 28;
+      ctx.drawImage(art.poop, -w / 2, -h / 2, w, h);
+    } else {
+      ctx.fillStyle = "#7a3cff";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 16, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.fillStyle = poop.state === "stain" ? "rgba(232, 230, 214, 0.85)" : "#f4f1e4";
-    ctx.beginPath();
-    ctx.ellipse(x, poop.y, poop.state === "fall" ? 6 : 11, poop.state === "fall" ? 7 : 4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.restore();
   }
 }
 
-function drawBeams(ctx: CanvasRenderingContext2D, sim: Sim, cam: number) {
-  for (const p of sim.platforms) {
-    const x = p.x - cam;
-    if (x > VIEW_W + 20 || x + p.w < -20) continue;
-    ctx.fillStyle = "#6e5844";
-    ctx.fillRect(x, GROUND - DECK - 16, p.w, 16);
-    ctx.fillStyle = "#8b6d52";
-    ctx.fillRect(x, GROUND - DECK - 16, p.w, 4);
+function drawCaptains(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
+  for (const captain of sim.captains) {
+    const x = captain.x - cam;
+    if (x < -180 || x > VIEW_W + 60) continue;
+    const idle = art.captain;
+    const thrown = art.captainThrow;
+    if (!idle) continue;
+    const h = 188;
+    const idleW = h * (idle.width / idle.height);
+    const throwW = thrown ? h * (thrown.width / thrown.height) : idleW;
+    let wind = 0;
+    let blend = 0;
+    if (captain.phase === "call") {
+      const p = 1 - captain.t / 0.9;
+      wind = -0.22 * p * p;
+    } else if (captain.phase === "throw") {
+      const p = 1 - captain.t / 0.55;
+      const e = p * p * (3 - 2 * p);
+      wind = -0.22 + e * 0.46;
+      blend = e;
+    } else if (captain.phase === "done") {
+      blend = 1;
+    }
+    ctx.save();
+    ctx.translate(x, GROUND);
+    ctx.rotate(wind);
+    ctx.globalAlpha = 1 - blend;
+    ctx.drawImage(idle, -idleW / 2, -h, idleW, h);
+    if (thrown && blend > 0) {
+      ctx.globalAlpha = blend;
+      ctx.drawImage(thrown, idleW / 2 - throwW, -h, throwW, h);
+    }
+    ctx.restore();
+    if (captain.phase === "call") drawNegroniBubble(ctx, x, GROUND - h - 18);
   }
 }
 
-function drawOneBird(ctx: CanvasRenderingContext2D, x: number, y: number, flap: number) {
+function drawNegroniBubble(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = "#12161a";
+  ctx.fillStyle = "#fffdf6";
+  ctx.strokeStyle = "#140e09";
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 16, 5, 0, 0, Math.PI * 2);
+  ctx.roundRect(-78, -40, 156, 36, 10);
+  ctx.moveTo(-10, -4);
+  ctx.lineTo(0, 12);
+  ctx.lineTo(10, -4);
   ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(8, -1);
-  ctx.quadraticCurveTo(22, -12, 32, -3);
-  ctx.lineTo(28, 1);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-2, -1);
-  ctx.quadraticCurveTo(10, -8 - flap * 18, 24, flap * 5);
-  ctx.lineTo(-6, 3);
-  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#140e09";
+  ctx.font = "700 22px Impact, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("NEGRONI!", 0, -22);
   ctx.restore();
+}
+
+function drawGlasses(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
+  for (const glass of sim.glasses) {
+    const x = glass.x - cam;
+    if (x < -40 || x > VIEW_W + 40) continue;
+    ctx.save();
+    ctx.translate(x, glass.y);
+    ctx.rotate(sim.time * 7);
+    if (art.negroni) ctx.drawImage(art.negroni, -16, -20, 32, 40);
+    ctx.restore();
+  }
+  if (sim.sip <= 0) return;
+  const x = sim.x - cam;
+  if (art.negroni) ctx.drawImage(art.negroni, x + 18, sim.y - 132, 26, 32);
 }
 
 function drawPump(ctx: CanvasRenderingContext2D, sim: Sim, cam: number) {

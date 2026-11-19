@@ -344,8 +344,29 @@ export function stopMusic() {
 }
 
 export function playVictory() {
-  [60, 64, 67, 72].forEach((note, i) => {
-    window.setTimeout(() => musicNote(note, 0.16, 0.08), i * 110);
+  stopMusic();
+  const line = [
+    [67, 71, 74],
+    [67, 71, 74],
+    [69, 72, 76],
+    [71, 74, 79],
+    [74, 78, 83],
+    [74, 78, 83],
+    [72, 76, 81],
+    [71, 74, 79],
+    [69, 74, 79],
+    [67, 71, 74],
+    [72, 79, 84],
+    [76, 84, 91],
+  ];
+  line.forEach((chord, i) => {
+    window.setTimeout(() => {
+      const last = i === line.length - 1;
+      chord.forEach((note, voice) => {
+        musicNote(note, last ? 0.85 : 0.2, voice === 0 ? 0.07 : 0.04, voice === 0 ? "square" : "triangle");
+      });
+      if (i % 2 === 0) musicNote((chord[0] ?? 67) - 12, last ? 0.7 : 0.16, 0.035, "square");
+    }, i * 180);
   });
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Lock, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import {
   isMuted,
@@ -61,13 +61,19 @@ import fountainSrc from "@/assets/sprites/fountain.png";
 import cannelleSrc from "@/assets/sprites/cannelle.png";
 import dogSrc from "@/assets/sprites/dog.png";
 import liberamiaSrc from "@/assets/sprites/liberamia.png";
+import cormorantSrc from "@/assets/sprites/cormorant.png";
+import gallerySrc from "@/assets/sprites/gallery.png";
+import poopSrc from "@/assets/sprites/poop.png";
+import captainSrc from "@/assets/sprites/captain.png";
+import captainThrowSrc from "@/assets/sprites/captain-throw.png";
+import negroniSrc from "@/assets/sprites/negroni.png";
 
 const RUN_SRC = [run1, run2, run3, run4];
 const JUMP_SRC = [jump1, jump2, jump3, jump4];
 const BUFF_RUN_SRC = [buffRun1, buffRun2, buffRun3, buffRun4];
 const BUFF_JUMP_SRC = [buffJump1, buffJump2, buffJump3, buffJump4];
 const FINALE_SRC = [finale1, finale2, finale3, finale4, finale5, finale6, finale7, finale8];
-const LANDMARK_SRC = [basilicaSrc, fountainSrc, cannelleSrc, dogSrc, liberamiaSrc];
+const LANDMARK_SRC = [basilicaSrc, fountainSrc, cannelleSrc, dogSrc, liberamiaSrc, cormorantSrc, gallerySrc, poopSrc, captainSrc, negroniSrc, captainThrowSrc];
 const STEP = 1 / 60;
 
 function loadImage(src: string) {
@@ -97,6 +103,8 @@ function writeBest(n: number) {
 
 export function GrandTheftPizzo() {
   const [screen, setScreen] = useState<"select" | "run">("select");
+  const [startLevel, setStartLevel] = useState<1 | 2 | 3>(1);
+  const [tester, setTester] = useState(false);
   const [ready, setReady] = useState(false);
   const [muted, setMutedUi] = useState(false);
   const [best, setBest] = useState(0);
@@ -113,6 +121,12 @@ export function GrandTheftPizzo() {
     cannelle: null,
     dog: null,
     liberamia: null,
+    cormorant: null,
+    gallery: null,
+    poop: null,
+    captain: null,
+    captainThrow: null,
+    negroni: null,
   });
 
   useEffect(() => {
@@ -136,6 +150,12 @@ export function GrandTheftPizzo() {
           cannelle: imgs[28] ?? null,
           dog: imgs[29] ?? null,
           liberamia: imgs[30] ?? null,
+          cormorant: imgs[31] ?? null,
+          gallery: imgs[32] ?? null,
+          poop: imgs[33] ?? null,
+          captain: imgs[34] ?? null,
+          negroni: imgs[35] ?? null,
+          captainThrow: imgs[36] ?? null,
         };
         setReady(true);
       })
@@ -169,16 +189,20 @@ export function GrandTheftPizzo() {
       ready={ready}
       muted={muted}
       onMute={toggleMute}
-      onPlay={() => {
+      onPlay={(level) => {
         unlockAudio();
+        setStartLevel(level);
         setScreen("run");
       }}
+      tester={tester}
+      onTester={() => setTester(true)}
     />
   ) : (
     <Runner
       art={art.current}
       best={best}
       muted={muted}
+      startLevel={startLevel}
       onMute={toggleMute}
       onBest={(n) => {
         setBest(n);
@@ -198,13 +222,33 @@ function SelectScreen({
   muted,
   onMute,
   onPlay,
+  tester,
+  onTester,
 }: {
   best: number;
   ready: boolean;
   muted: boolean;
   onMute: () => void;
-  onPlay: () => void;
+  onPlay: (level: 1 | 2 | 3) => void;
+  tester: boolean;
+  onTester: () => void;
 }) {
+  const [askPin, setAskPin] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinBad, setPinBad] = useState(false);
+
+  function submitPin(event: FormEvent) {
+    event.preventDefault();
+    if (pin === "3483") {
+      onTester();
+      setAskPin(false);
+      setPin("");
+      setPinBad(false);
+      return;
+    }
+    setPinBad(true);
+  }
+
   return (
     <main className="min-h-dvh bg-[#090b0e]">
       <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
@@ -219,8 +263,20 @@ function SelectScreen({
                 <br />
                 CHINATOWN
               </h1>
-              <img src={logo} alt="" className="size-24 shrink-0 sm:size-36" />
+              <button
+                type="button"
+                className="shrink-0"
+                onClick={() => {
+                  setAskPin(true);
+                  setPin("");
+                  setPinBad(false);
+                }}
+                aria-label="PIN tester"
+              >
+                <img src={logo} alt="" className="size-24 sm:size-36" />
+              </button>
             </div>
+            {tester ? <p className="mt-3 text-xs tracking-[0.2em] text-[#f2c14e] uppercase">Tester</p> : null}
           </div>
           <button
             type="button"
@@ -232,6 +288,42 @@ function SelectScreen({
             {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
           </button>
         </header>
+
+        {askPin && !tester ? (
+          <form
+            onSubmit={submitPin}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          >
+            <div className="w-full max-w-xs rounded-md border border-[#f2c14e]/70 bg-[#090b0e] p-5">
+              <p className="font-display text-3xl tracking-wide">PIN</p>
+              <input
+                value={pin}
+                onChange={(event) => {
+                  setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                  setPinBad(false);
+                }}
+                inputMode="numeric"
+                autoComplete="off"
+                autoFocus
+                aria-label="PIN"
+                className="mt-4 h-12 w-full rounded-md border border-line bg-black px-3 text-center text-xl tracking-[0.4em] text-fg outline-none"
+              />
+              {pinBad ? <p className="mt-2 text-sm text-[#f2c14e]">No</p> : null}
+              <div className="mt-4 flex gap-2">
+                <button type="submit" className="h-11 flex-1 rounded-md bg-[#f2c14e] text-sm font-medium text-black">
+                  Entra
+                </button>
+                <button
+                  type="button"
+                  className="h-11 rounded-md border border-line px-4 text-sm"
+                  onClick={() => setAskPin(false)}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : null}
 
         <section className="grid gap-3 sm:grid-cols-3" aria-label="Personaggi">
           <article className="flex flex-col overflow-hidden rounded-md border border-[#f2c14e]/70 bg-black">
@@ -245,15 +337,31 @@ function SelectScreen({
                 <p className="mt-1">Spacebar or W — Jump</p>
                 <p>Special move — Q</p>
               </div>
-              <button
-                type="button"
-                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f2c14e] px-4 text-sm font-medium text-black disabled:opacity-40"
-                onClick={onPlay}
-                disabled={!ready}
-              >
-                <Play className="size-4" aria-hidden />
-                {ready ? "Gioca" : "Carico"}
-              </button>
+              {tester ? (
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {([1, 2, 3] as const).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#f2c14e] px-2 text-sm font-medium text-black disabled:opacity-40"
+                      onClick={() => onPlay(level)}
+                      disabled={!ready}
+                    >
+                      Liv. {level}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f2c14e] px-4 text-sm font-medium text-black disabled:opacity-40"
+                  onClick={() => onPlay(1)}
+                  disabled={!ready}
+                >
+                  <Play className="size-4" aria-hidden />
+                  {ready ? "Gioca" : "Carico"}
+                </button>
+              )}
             </div>
           </article>
 
@@ -297,6 +405,7 @@ function Runner({
   onMute,
   onBest,
   onExit,
+  startLevel,
 }: {
   art: Art;
   best: number;
@@ -304,10 +413,12 @@ function Runner({
   onMute: () => void;
   onBest: (n: number) => void;
   onExit: () => void;
+  startLevel: 1 | 2 | 3;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const metersRef = useRef<HTMLSpanElement>(null);
-  const simRef = useRef<Sim>(createSim(Date.now() % 99991 || 1));
+  const simRef = useRef<Sim>(createSim(Date.now() % 99991 || 1, startLevel));
+  const dashRef = useRef(0);
   const heldRef = useRef(false);
   const edgeRef = useRef(false);
   const creatineRef = useRef(false);
@@ -316,7 +427,6 @@ function Runner({
     typeof window === "undefined" || !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const introRef = useRef(true);
-  const introTimer = useRef(0);
   const [paused, setPaused] = useState(false);
   const [ending, setEnding] = useState<"wet" | "dog" | "poop" | "cigar" | null>(null);
   const [over, setOver] = useState<number | null>(null);
@@ -324,15 +434,15 @@ function Runner({
   const [showHint, setShowHint] = useState(true);
   const [pumped, setPumped] = useState(false);
   const [intro, setIntro] = useState(true);
-  const [level, setLevel] = useState<1 | 2 | 3>(1);
+  const [level, setLevel] = useState<1 | 2 | 3>(startLevel);
   const bestRef = useRef(best);
   const onBestRef = useRef(onBest);
   bestRef.current = best;
   onBestRef.current = onBest;
 
   useEffect(() => {
-    startLevelMusic();
-    startWater();
+    startLevelMusic(startLevel);
+    if (startLevel === 1) startWater();
     return () => stopRain();
   }, []);
 
@@ -343,11 +453,6 @@ function Runner({
   useEffect(() => {
     introRef.current = intro;
   }, [intro]);
-
-  useEffect(() => {
-    introTimer.current = window.setTimeout(() => setIntro(false), 2200);
-    return () => window.clearTimeout(introTimer.current);
-  }, []);
 
   useEffect(() => {
     shakeRef.current = shake;
@@ -365,6 +470,7 @@ function Runner({
     let prevGround = true;
     let prevFrame = 0;
     let prevPump: Sim["pump"] = "off";
+    let prevSip = 0;
     let prevLit = false;
     let active = simRef.current;
 
@@ -396,6 +502,7 @@ function Runner({
         prevGround = true;
         prevFrame = 0;
         prevPump = "off";
+        prevSip = 0;
         prevLit = false;
         acc = 0;
       }
@@ -411,8 +518,15 @@ function Runner({
           let steps = 0;
           while (acc >= STEP && steps < 5) {
             const pressed = edgeRef.current;
-            step(sim, STEP, { pressed, held: heldRef.current, creatine });
+            const dash = dashRef.current;
+            step(sim, STEP, {
+              pressed,
+              held: heldRef.current,
+              creatine,
+              dash,
+            });
             if (pressed) edgeRef.current = false;
+            if (dash) dashRef.current = 0;
             acc -= STEP;
             steps += 1;
           }
@@ -426,6 +540,8 @@ function Runner({
           if (sim.grounded && sim.alive && !sim.won && frame !== prevFrame) playStep();
           prevFrame = frame;
           prevGround = sim.grounded;
+          if (sim.sip > prevSip) playGulp();
+          prevSip = sim.sip;
           if (prevPump === "off" && sim.pump === "drink") {
             playGulp();
             setPumped(true);
@@ -484,6 +600,21 @@ function Runner({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (introRef.current) {
+        if (e.key === "." || e.code === "Period" || e.code === "NumpadDecimal") {
+          e.preventDefault();
+          introRef.current = false;
+          setIntro(false);
+        }
+        return;
+      }
+      if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+        e.preventDefault();
+        if (e.repeat) return;
+        if (pausedRef.current || !simRef.current.alive || simRef.current.won) return;
+        dashRef.current = e.code === "ArrowLeft" ? -1 : 1;
+        return;
+      }
       if (e.repeat) return;
       if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
         e.preventDefault();
@@ -561,10 +692,9 @@ function Runner({
     setPumped(false);
     setIntro(true);
     introRef.current = true;
-    window.clearTimeout(introTimer.current);
-    introTimer.current = window.setTimeout(() => setIntro(false), 2200);
     creatineRef.current = false;
     heldRef.current = false;
+    dashRef.current = 0;
     stopRain();
     if (next === 1) startWater();
     startLevelMusic(next);
@@ -621,19 +751,31 @@ function Runner({
           onPointerCancel={() => hop(false)}
         />
         {intro ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
-            <p className="px-4 text-center font-display text-5xl tracking-wide text-[#f2c14e] sm:text-7xl">
-              {level === 1
-                ? "LIVELLO 1 - Fontana Luminosa"
-                : level === 2
-                  ? "LIVELLO 2 - Liberamia"
-                  : "LIVELLO 3 - Collemaggio"}
-            </p>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55 px-4">
+            <div className="w-full max-w-md rounded-md border border-[#f2c14e]/70 bg-[#090b0e] px-6 py-5 text-center">
+              <p className="font-display text-4xl tracking-wide text-[#f2c14e] sm:text-5xl">
+                {level === 1 ? "LIVELLO 1" : level === 2 ? "LIVELLO 2" : "LIVELLO 3"}
+              </p>
+              <div className="mt-5 space-y-1 text-sm tracking-wide text-fg uppercase">
+                <p>Barra spazio o W — salto</p>
+                {level === 2 ? (
+                  <>
+                    <p>Freccia sinistra — scatto indietro</p>
+                    <p>Freccia destra — scatto avanti</p>
+                    <p className="text-[#f2c14e]">La corsa non si ferma</p>
+                  </>
+                ) : null}
+                <p>Q — mossa speciale</p>
+              </div>
+              <p className="mt-5 text-sm tracking-[0.18em] text-[#f2c14e] uppercase">Premi . per iniziare</p>
+            </div>
           </div>
         ) : null}
         {showHint && over === null && !paused && !intro ? (
           <p className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-bg/80 px-3 py-2 text-sm text-fg">
-            Tocca, barra o W — salto. Q — mossa.
+            {level === 2
+              ? "Frecce — scatto avanti o indietro. Non si può ripetere subito."
+              : "Tocca, barra o W — salto. Q — mossa."}
           </p>
         ) : null}
 
