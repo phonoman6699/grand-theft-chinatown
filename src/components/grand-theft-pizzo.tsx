@@ -20,12 +20,15 @@ import {
   startMenuMusic,
   startWater,
   setMusicRush,
+  setCrowdNear,
+  playCrowdCheer,
+  playCrowdMiss,
   stopMusic,
   stopRain,
   unlockAudio,
 } from "@/game/audio";
 import { drawWorld, type Art } from "@/game/render";
-import { BEST_KEY, FINISH_X, GROUND, VIEW_H, VIEW_W, createSim, metersOf, step, type Sim } from "@/game/sim";
+import { BEST_KEY, FINISH_X, GROUND, VIEW_H, VIEW_W, answerQuiz, createSim, metersOf, step, type Sim } from "@/game/sim";
 import run1 from "@/assets/sprites/run-1.png";
 import run2 from "@/assets/sprites/run-2.png";
 import run3 from "@/assets/sprites/run-3.png";
@@ -63,17 +66,33 @@ import dogSrc from "@/assets/sprites/dog.png";
 import liberamiaSrc from "@/assets/sprites/liberamia.png";
 import cormorantSrc from "@/assets/sprites/cormorant.png";
 import gallerySrc from "@/assets/sprites/gallery.png";
-import poopSrc from "@/assets/sprites/poop.png";
+import poopSrc from "@/assets/sprites/poop-bird.png";
 import captainSrc from "@/assets/sprites/captain.png";
+import captainRunSrc from "@/assets/sprites/captain-run.png";
+import captainRun2Src from "@/assets/sprites/captain-run-2.png";
+import captainCallSrc from "@/assets/sprites/captain-call.png";
 import captainThrowSrc from "@/assets/sprites/captain-throw.png";
 import negroniSrc from "@/assets/sprites/negroni.png";
+import treePlaneSrc from "@/assets/sprites/tree-plane.png";
+import treeLindenSrc from "@/assets/sprites/tree-linden.png";
+import treeChestnutSrc from "@/assets/sprites/tree-chestnut.png";
+import treeCypressSrc from "@/assets/sprites/tree-cypress.png";
+import treePineSrc from "@/assets/sprites/tree-pine.png";
+import treePoplarSrc from "@/assets/sprites/tree-poplar.png";
+import fanNSrc from "@/assets/sprites/crowd-1.png";
+import fanWomanSrc from "@/assets/sprites/crowd-2.png";
+import fanKidSrc from "@/assets/sprites/crowd-3.png";
+import fanBearerSrc from "@/assets/sprites/crowd-4.png";
+import castleSrc from "@/assets/sprites/castle.png";
 
 const RUN_SRC = [run1, run2, run3, run4];
 const JUMP_SRC = [jump1, jump2, jump3, jump4];
 const BUFF_RUN_SRC = [buffRun1, buffRun2, buffRun3, buffRun4];
 const BUFF_JUMP_SRC = [buffJump1, buffJump2, buffJump3, buffJump4];
 const FINALE_SRC = [finale1, finale2, finale3, finale4, finale5, finale6, finale7, finale8];
-const LANDMARK_SRC = [basilicaSrc, fountainSrc, cannelleSrc, dogSrc, liberamiaSrc, cormorantSrc, gallerySrc, poopSrc, captainSrc, negroniSrc, captainThrowSrc];
+const LANDMARK_SRC = [basilicaSrc, fountainSrc, cannelleSrc, dogSrc, liberamiaSrc, cormorantSrc, gallerySrc, poopSrc, captainSrc, negroniSrc, captainThrowSrc, captainRunSrc, captainRun2Src, captainCallSrc];
+const TREE_SRC = [treePlaneSrc, treeLindenSrc, treeChestnutSrc, treeCypressSrc, treePineSrc, treePoplarSrc];
+const FAN_SRC = [fanNSrc, fanWomanSrc, fanKidSrc, fanBearerSrc];
 const STEP = 1 / 60;
 
 function loadImage(src: string) {
@@ -125,15 +144,22 @@ export function GrandTheftPizzo() {
     gallery: null,
     poop: null,
     captain: null,
+    captainRun: null,
+    captainRun2: null,
+    captainCall: null,
     captainThrow: null,
     negroni: null,
+    trees: [],
+    fans: [],
+    napoliFlag: null,
+    castle: null,
   });
 
   useEffect(() => {
     setBest(readBest());
     let cancel = false;
     Promise.all(
-      [...RUN_SRC, ...JUMP_SRC, cigarSrc, ...BUFF_RUN_SRC, ...BUFF_JUMP_SRC, drinkSrc, ...FINALE_SRC, ...LANDMARK_SRC].map(loadImage),
+      [...RUN_SRC, ...JUMP_SRC, cigarSrc, ...BUFF_RUN_SRC, ...BUFF_JUMP_SRC, drinkSrc, ...FINALE_SRC, ...LANDMARK_SRC, ...TREE_SRC, ...FAN_SRC, castleSrc].map(loadImage),
     )
       .then((imgs) => {
         if (cancel) return;
@@ -156,6 +182,13 @@ export function GrandTheftPizzo() {
           captain: imgs[34] ?? null,
           negroni: imgs[35] ?? null,
           captainThrow: imgs[36] ?? null,
+          captainRun: imgs[37] ?? null,
+          captainRun2: imgs[38] ?? null,
+          captainCall: imgs[39] ?? null,
+          trees: imgs.slice(40, 46),
+          fans: imgs.slice(46, 50),
+          napoliFlag: null,
+          castle: imgs[50] ?? null,
         };
         setReady(true);
       })
@@ -280,7 +313,7 @@ function SelectScreen({
           </div>
           <button
             type="button"
-            className="inline-flex size-11 items-center justify-center rounded-md border border-line bg-surface text-fg"
+            className="menu-pick inline-flex size-11 items-center justify-center rounded-md border border-line bg-surface text-fg"
             onClick={onMute}
             aria-label={muted ? "Attiva suono" : "Disattiva suono"}
             aria-pressed={muted}
@@ -310,12 +343,12 @@ function SelectScreen({
               />
               {pinBad ? <p className="mt-2 text-sm text-[#f2c14e]">No</p> : null}
               <div className="mt-4 flex gap-2">
-                <button type="submit" className="h-11 flex-1 rounded-md bg-[#f2c14e] text-sm font-medium text-black">
+                <button type="submit" className="menu-pick h-11 flex-1 rounded-md bg-[#f2c14e] text-sm font-medium text-black">
                   Entra
                 </button>
                 <button
                   type="button"
-                  className="h-11 rounded-md border border-line px-4 text-sm"
+                  className="menu-pick h-11 rounded-md border border-line px-4 text-sm"
                   onClick={() => setAskPin(false)}
                 >
                   Chiudi
@@ -343,7 +376,7 @@ function SelectScreen({
                     <button
                       key={level}
                       type="button"
-                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#f2c14e] px-2 text-sm font-medium text-black disabled:opacity-40"
+                      className="menu-pick inline-flex min-h-11 items-center justify-center rounded-md bg-[#f2c14e] px-2 text-sm font-medium text-black disabled:opacity-40"
                       onClick={() => onPlay(level)}
                       disabled={!ready}
                     >
@@ -354,7 +387,7 @@ function SelectScreen({
               ) : (
                 <button
                   type="button"
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f2c14e] px-4 text-sm font-medium text-black disabled:opacity-40"
+                  className="menu-pick mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f2c14e] px-4 text-sm font-medium text-black disabled:opacity-40"
                   onClick={() => onPlay(1)}
                   disabled={!ready}
                 >
@@ -434,6 +467,13 @@ function Runner({
   const [showHint, setShowHint] = useState(true);
   const [pumped, setPumped] = useState(false);
   const [intro, setIntro] = useState(true);
+  const [quiz, setQuiz] = useState<number | null>(null);
+  const [card, setCard] = useState<{ who: string; prompt: string } | null>(null);
+  const [miss, setMiss] = useState<number[]>([]);
+  const [options, setOptions] = useState<{ line: string; pick: number }[]>([]);
+  const quizShown = useRef<number | null>(null);
+  const optionsRef = useRef<{ line: string; pick: number }[]>([]);
+  const chooseRef = useRef<(shown: number) => void>(() => {});
   const [level, setLevel] = useState<1 | 2 | 3>(startLevel);
   const bestRef = useRef(best);
   const onBestRef = useRef(onBest);
@@ -591,6 +631,31 @@ function Runner({
         }
       }
       if (metersRef.current) metersRef.current.textContent = String(metersOf(sim));
+      if (sim.quiz !== quizShown.current) {
+        const was = quizShown.current;
+        quizShown.current = sim.quiz;
+        if (sim.level === 3) {
+          if (sim.quiz !== null) setCrowdNear(true);
+          else if (was !== null) {
+            setCrowdNear(false);
+            playCrowdCheer();
+          }
+        }
+        setQuiz(sim.quiz);
+        setMiss([]);
+        const choir = sim.choirs.find((item) => item.id === sim.quiz);
+        const song = choir?.riddle ?? null;
+        setCard(song ? { who: song.who, prompt: song.prompt } : null);
+        const bag = song ? song.choices.map((line, pick) => ({ line, pick })) : [];
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const swap = bag[i];
+          bag[i] = bag[j];
+          bag[j] = swap;
+        }
+        optionsRef.current = bag;
+        setOptions(bag);
+      }
       fit();
       drawWorld(ctx, sim, art, shakeRef.current);
       } catch (err) {
@@ -606,6 +671,11 @@ function Runner({
           introRef.current = false;
           setIntro(false);
         }
+        return;
+      }
+      if (simRef.current.quiz !== null && /^[123]$/.test(e.key)) {
+        e.preventDefault();
+        chooseRef.current(Number(e.key) - 1);
         return;
       }
       if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
@@ -692,6 +762,12 @@ function Runner({
     setPumped(false);
     setIntro(true);
     introRef.current = true;
+    quizShown.current = null;
+    optionsRef.current = [];
+    setQuiz(null);
+    setCard(null);
+    setMiss([]);
+    setOptions([]);
     creatineRef.current = false;
     heldRef.current = false;
     dashRef.current = 0;
@@ -699,6 +775,14 @@ function Runner({
     if (next === 1) startWater();
     startLevelMusic(next);
   }
+
+  chooseRef.current = (shown: number) => {
+    const option = optionsRef.current[shown];
+    if (!option || simRef.current.quiz === null) return;
+    if (answerQuiz(simRef.current, option.pick)) return;
+    playCrowdMiss();
+    setMiss((current) => (current.includes(option.pick) ? current : [...current, option.pick]));
+  };
 
   function retry() {
     begin(level);
@@ -721,7 +805,7 @@ function Runner({
           onClick={() => {
             creatineRef.current = true;
           }}
-          disabled={pumped || over !== null || intro}
+          disabled={pumped || over !== null || intro || level === 3}
         >
           Q
         </button>
@@ -757,26 +841,64 @@ function Runner({
                 {level === 1 ? "LIVELLO 1" : level === 2 ? "LIVELLO 2" : "LIVELLO 3"}
               </p>
               <div className="mt-5 space-y-1 text-sm tracking-wide text-fg uppercase">
-                <p>Barra spazio o W — salto</p>
-                {level === 2 ? (
+                {level === 3 ? (
                   <>
-                    <p>Freccia sinistra — scatto indietro</p>
-                    <p>Freccia destra — scatto avanti</p>
-                    <p className="text-[#f2c14e]">La corsa non si ferma</p>
+                    <p>Corri e basta</p>
+                    <p>Scegli la frase che chiude il ritornello</p>
                   </>
-                ) : null}
-                <p>Q — mossa speciale</p>
+                ) : (
+                  <>
+                    <p>Barra spazio o W — salto</p>
+                    {level === 2 ? (
+                      <>
+                        <p>Freccia sinistra — scatto indietro</p>
+                        <p>Freccia destra — scatto avanti</p>
+                        <p className="text-[#f2c14e]">La corsa non si ferma</p>
+                      </>
+                    ) : null}
+                    <p>Q — mossa speciale</p>
+                  </>
+                )}
               </div>
               <p className="mt-5 text-sm tracking-[0.18em] text-[#f2c14e] uppercase">Premi . per iniziare</p>
             </div>
           </div>
         ) : null}
-        {showHint && over === null && !paused && !intro ? (
+        {showHint && over === null && !paused && !intro && quiz === null ? (
           <p className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-bg/80 px-3 py-2 text-sm text-fg">
-            {level === 2
+            {level === 3
+              ? "Quando ti fermano, scegli il ritornello."
+              : level === 2
               ? "Frecce — scatto avanti o indietro. Non si può ripetere subito."
               : "Tocca, barra o W — salto. Q — mossa."}
           </p>
+        ) : null}
+        {quiz !== null && card ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 px-4">
+            <div className="w-full max-w-lg rounded-md border border-[#1aa3e0] bg-[#090b0e] p-5">
+              <p className="text-xs tracking-[0.18em] text-[#1aa3e0] uppercase">{card.who}</p>
+              <p className="mt-1 font-display text-3xl tracking-wide text-[#f2c14e]">Scegli la frase</p>
+              <p className="mt-2 text-lg">{card.prompt}</p>
+              <div className="mt-4 grid gap-2">
+                {options.map((option, index) => (
+                  <button
+                    key={option.line}
+                    type="button"
+                    className={`menu-pick flex min-h-12 items-center gap-3 rounded-md border px-3 text-left text-sm ${
+                      miss.includes(option.pick) ? "border-[#ff6b6b] text-[#ff8f8f]" : "border-line bg-black text-fg"
+                    }`}
+                    disabled={miss.includes(option.pick)}
+                    onClick={() => chooseRef.current(index)}
+                  >
+                    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm bg-[#1aa3e0] text-sm font-medium text-black">
+                      {index + 1}
+                    </span>
+                    {option.line}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {paused ? (

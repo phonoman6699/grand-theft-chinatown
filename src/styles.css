@@ -93,3 +93,30 @@ button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+.menu-pick {
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms ease;
+}
+
+.menu-pick:hover:not(:disabled),
+.menu-pick:focus-visible:not(:disabled) {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 8px 0 #000, 0 0 0 2px #f2c14e;
+}
+
+.menu-pick:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 0 #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-pick,
+  .menu-pick:hover:not(:disabled),
+  .menu-pick:focus-visible:not(:disabled),
+  .menu-pick:active:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
+}

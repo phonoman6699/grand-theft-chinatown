@@ -17,8 +17,15 @@ export type Art = {
   gallery: HTMLImageElement | null;
   poop: HTMLImageElement | null;
   captain: HTMLImageElement | null;
+  captainRun: HTMLImageElement | null;
+  captainRun2: HTMLImageElement | null;
+  captainCall: HTMLImageElement | null;
   captainThrow: HTMLImageElement | null;
   negroni: HTMLImageElement | null;
+  trees: HTMLImageElement[];
+  fans: HTMLImageElement[];
+  napoliFlag: HTMLImageElement | null;
+  castle: HTMLImageElement | null;
 };
 
 type House = { x: number; w: number; h: number; roof: number };
@@ -49,10 +56,9 @@ export function drawWorld(
     sky.addColorStop(0.74, "#f7e3a4");
     sky.addColorStop(1, "#f6d7a4");
   } else if (sim.level === 3) {
-    sky.addColorStop(0, "#243a62");
-    sky.addColorStop(0.36, "#c46b4a");
-    sky.addColorStop(0.7, "#f0b36a");
-    sky.addColorStop(1, "#f6d7b4");
+    sky.addColorStop(0, "#79c7f2");
+    sky.addColorStop(0.5, "#d9f3c4");
+    sky.addColorStop(1, "#c6e6a6");
   } else {
     sky.addColorStop(0, "#163246");
     sky.addColorStop(0.38, "#4e7384");
@@ -71,9 +77,9 @@ export function drawWorld(
     ctx.arc(800, 74, 58, 0, Math.PI * 2);
     ctx.fill();
   } else if (sim.level === 3) {
-    ctx.fillStyle = "#ffb15a";
+    ctx.fillStyle = "#fff4c4";
     ctx.beginPath();
-    ctx.arc(150, 150, 28, 0, Math.PI * 2);
+    ctx.arc(780, 86, 32, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -88,14 +94,21 @@ export function drawWorld(
   }
 
   drawClouds(ctx, cam);
-  drawGranSasso(ctx, cam);
-  drawFoothills(ctx, cam);
-  drawTown(ctx, cam);
-  if (sim.level === 2) drawGalleryBackdrop(ctx, sim, art, cam);
-  drawCypresses(ctx, cam);
-  drawTower(ctx, 2400 - cam);
-  drawBernardino(ctx, 4300 - cam);
-  drawFort(ctx, 6400 - cam);
+  if (sim.level === 3) {
+    drawGranSasso(ctx, cam);
+    drawFoothills(ctx, cam);
+    drawAvenue(ctx, cam, false, art, sim);
+    drawCastle(ctx, cam, art);
+  } else {
+    drawGranSasso(ctx, cam);
+    drawFoothills(ctx, cam);
+    drawTown(ctx, cam);
+    if (sim.level === 2) drawGalleryBackdrop(ctx, sim, art, cam);
+    drawCypresses(ctx, cam);
+    drawTower(ctx, 2400 - cam);
+    drawBernardino(ctx, 4300 - cam);
+    drawFort(ctx, 6400 - cam);
+  }
   if (sim.level === 3) {
     if (!drawPlaced(ctx, art.basilica, FINISH_X + 80 - cam, 500, 300)) {
       drawCollemaggio(ctx, FINISH_X + 40 - cam);
@@ -109,8 +122,8 @@ export function drawWorld(
     if (!drawPlaced(ctx, art.fountain, FINISH_X + 280 - cam, 168, 236)) drawFountain(ctx, FINISH_X + 280 - cam);
     else drawFountainJets(ctx, FINISH_X + 280 - cam + 70, sim.time);
   }
-  drawPortici(ctx, cam);
-  if (sim.level !== 2) drawCormorants(ctx, sim.time);
+  if (sim.level !== 2 && sim.level !== 3) drawPortici(ctx, cam);
+  if (sim.level === 1) drawCormorants(ctx, sim.time);
 
   drawSampietrini(ctx, cam);
 
@@ -142,7 +155,9 @@ export function drawWorld(
     ctx.restore();
   }
 
+  if (sim.level === 3) drawAvenue(ctx, cam, true, art, sim);
   drawDogs(ctx, sim, art, cam);
+  if (sim.level === 3) drawChoirs(ctx, sim, art, cam);
   if (sim.level === 2) drawBirds(ctx, sim, art, cam);
   if (sim.level === 2) drawCaptains(ctx, sim, art, cam);
 
@@ -251,24 +266,93 @@ function drawBirds(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: numbe
   }
 }
 
+function drawAvenue(ctx: CanvasRenderingContext2D, cam: number, front: boolean, art: Art, sim: Sim) {
+  const trees = art.trees.filter((tree) => tree);
+  const spacing = 300;
+  const start = Math.floor(cam / spacing) * spacing - spacing;
+  for (let world = start; world < cam + VIEW_W + spacing; world += spacing) {
+    if (world > FINISH_X - 780) continue;
+    if (sim.choirs.some((choir) => Math.abs(choir.x - world) < 280)) continue;
+    const slot = Math.round(world / spacing);
+    const img = trees[(slot + (front ? 1 : 0)) % Math.max(1, trees.length)];
+    const x = world - cam + (front ? 120 : 10);
+    if (!img) {
+      drawPlane(ctx, x, front ? VIEW_H + 8 : GROUND - 6, front ? 1.05 : 0.9);
+      continue;
+    }
+    const h = (front ? 190 : 250) + (Math.abs(slot) % 3) * 22;
+    const w = h * (img.width / img.height);
+    const foot = front ? VIEW_H - 6 : GROUND + 4;
+    ctx.drawImage(img, x - w / 2, foot - h, w, h);
+  }
+}
+
+function drawPlane(ctx: CanvasRenderingContext2D, x: number, ground: number, scale: number) {
+  ctx.fillStyle = "#5c3d26";
+  ctx.fillRect(x, ground - 78 * scale, 9 * scale, 78 * scale);
+  ctx.fillStyle = "#2d7a3c";
+  ctx.beginPath();
+  ctx.arc(x + 4 * scale, ground - 86 * scale, 30 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#46a356";
+  ctx.beginPath();
+  ctx.arc(x - 14 * scale, ground - 70 * scale, 18 * scale, 0, Math.PI * 2);
+  ctx.arc(x + 22 * scale, ground - 72 * scale, 16 * scale, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawCastle(ctx: CanvasRenderingContext2D, cam: number, art: Art) {
+  if (!art.castle) return;
+  const h = 168;
+  const w = h * (art.castle.width / art.castle.height);
+  const x = FINISH_X * 0.5 - cam - w / 2;
+  if (x > VIEW_W + 20 || x + w < -20) return;
+  ctx.drawImage(art.castle, x, GROUND - h - 18, w, h);
+}
+
+function drawChoirs(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
+  const fans = art.fans.filter((fan) => fan);
+  for (const choir of sim.choirs) {
+    const img = fans[choir.song];
+    if (!img) continue;
+    const x = choir.x - cam;
+    const h = 186;
+    const w = h * (img.width / img.height);
+    if (x + w / 2 < -40 || x - w / 2 > VIEW_W + 40) continue;
+    const bob = choir.done ? Math.abs(Math.sin(sim.time * 6 + choir.id)) * 4 : 0;
+    ctx.drawImage(img, x - w / 2, GROUND - h - bob, w, h);
+  }
+}
+
 function drawPoops(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
   for (const poop of sim.poops) {
     if (poop.life <= 0) continue;
     const x = poop.x - cam;
     if (x < -40 || x > VIEW_W + 40) continue;
-    const spin = poop.state === "fall" ? Math.sin(sim.time * 10 + poop.id) * 0.35 : 0;
+    const spin = poop.state === "fall" ? Math.sin(sim.time * 8 + poop.id) * 0.4 : 0;
+    const fall = poop.state === "fall";
+    const w = fall ? 36 : 42;
+    const h = fall ? 52 : 20;
     ctx.save();
     ctx.translate(x, poop.y);
     ctx.rotate(spin);
-    if (art.poop) {
-      const w = poop.state === "fall" ? 46 : 54;
-      const h = poop.state === "fall" ? 70 : 28;
-      ctx.drawImage(art.poop, -w / 2, -h / 2, w, h);
-    } else {
-      ctx.fillStyle = "#7a3cff";
+    if (fall) {
+      ctx.strokeStyle = "rgba(255, 252, 240, 0.9)";
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.ellipse(0, 0, 16, 22, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(0, -h * 0.2);
+      ctx.lineTo(-3, -h * 0.85);
+      ctx.stroke();
+    }
+    if (art.poop) {
+      ctx.shadowColor = "#fffdf8";
+      ctx.shadowBlur = 10;
+      ctx.drawImage(art.poop, -w / 2, -h / 2, w, h);
+      ctx.shadowColor = "#140e0a";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      ctx.drawImage(art.poop, -w / 2, -h / 2, w, h);
     }
     ctx.restore();
   }
@@ -276,44 +360,60 @@ function drawPoops(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: numbe
 
 function drawCaptains(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: number) {
   for (const captain of sim.captains) {
+    if (captain.phase === "wait" || captain.phase === "gone") continue;
     const x = captain.x - cam;
-    if (x < -180 || x > VIEW_W + 60) continue;
-    const idle = art.captain;
+    if (x < -180 || x > VIEW_W + 160) continue;
+    const runA = art.captainRun ?? art.captain;
+    const runB = art.captainRun2 ?? runA;
+    if (!runA) continue;
     const thrown = art.captainThrow;
-    if (!idle) continue;
-    const h = 188;
-    const idleW = h * (idle.width / idle.height);
-    const throwW = thrown ? h * (thrown.width / thrown.height) : idleW;
-    let wind = 0;
+    const talking = captain.phase === "call";
+    const throwing = captain.phase === "throw";
+    const leaving = captain.phase === "leave";
+    const arriving = captain.phase === "arrive";
+    const stride = sim.time * (talking ? 7 : leaving ? 16 : 12);
+    const frame = Math.sin(stride) > 0 ? runA : runB;
+    if (!frame) continue;
+    const bob = Math.abs(Math.sin(stride)) * (talking ? 5 : arriving || leaving ? 10 : 8);
+    const squash = 1 + Math.sin(stride * 2) * (talking ? 0.03 : 0.06);
+    let lean = Math.sin(stride) * (talking ? 0.04 : 0.09);
     let blend = 0;
-    if (captain.phase === "call") {
-      const p = 1 - captain.t / 0.9;
-      wind = -0.22 * p * p;
-    } else if (captain.phase === "throw") {
-      const p = 1 - captain.t / 0.55;
-      const e = p * p * (3 - 2 * p);
-      wind = -0.22 + e * 0.46;
-      blend = e;
-    } else if (captain.phase === "done") {
-      blend = 1;
+    let lunge = 0;
+    let hop = 0;
+    if (talking && art.captainCall) hop = Math.abs(Math.sin(sim.time * 9)) * 6;
+    if (throwing) {
+      const p = 1 - Math.max(0, captain.t) / 0.5;
+      const wind = Math.min(1, p / 0.45);
+      const swing = wind < 1 ? -wind * 0.35 : Math.sin((p - 0.45) / 0.55 * Math.PI);
+      blend = wind < 1 ? 0 : Math.min(1, (p - 0.45) / 0.35);
+      lunge = Math.max(0, swing) * 46;
+      lean = swing;
+      hop = wind < 1 ? (1 - wind) * 4 : 0;
     }
+    const h = 168 * squash;
+    const posed = art.captainCall ?? frame;
+    const body = ((throwing && blend < 0.5) || talking) ? posed : frame;
+    const bodyW = h * (body.width / body.height);
+    const throwW = thrown ? h * (thrown.width / thrown.height) : bodyW;
     ctx.save();
-    ctx.translate(x, GROUND);
-    ctx.rotate(wind);
+    ctx.translate(x - lunge, GROUND - bob - hop);
+    ctx.rotate(lean);
+    if (leaving) ctx.scale(-1, 1);
     ctx.globalAlpha = 1 - blend;
-    ctx.drawImage(idle, -idleW / 2, -h, idleW, h);
+    ctx.drawImage(body, -bodyW / 2, -h, bodyW, h);
     if (thrown && blend > 0) {
       ctx.globalAlpha = blend;
-      ctx.drawImage(thrown, idleW / 2 - throwW, -h, throwW, h);
+      ctx.drawImage(thrown, -throwW * 0.7, -h, throwW, h);
     }
     ctx.restore();
-    if (captain.phase === "call") drawNegroniBubble(ctx, x, GROUND - h - 18);
+    if (talking || throwing) drawNegroniBubble(ctx, x - lunge, GROUND - h - bob - hop - 16, talking ? 1 + Math.sin(sim.time * 10) * 0.06 : 1);
   }
 }
 
-function drawNegroniBubble(ctx: CanvasRenderingContext2D, x: number, y: number) {
+function drawNegroniBubble(ctx: CanvasRenderingContext2D, x: number, y: number, pulse = 1) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(pulse, pulse);
   ctx.fillStyle = "#fffdf6";
   ctx.strokeStyle = "#140e09";
   ctx.lineWidth = 4;
@@ -336,10 +436,14 @@ function drawGlasses(ctx: CanvasRenderingContext2D, sim: Sim, art: Art, cam: num
   for (const glass of sim.glasses) {
     const x = glass.x - cam;
     if (x < -40 || x > VIEW_W + 40) continue;
+    const ang = Math.atan2(glass.vy, glass.vx);
     ctx.save();
     ctx.translate(x, glass.y);
-    ctx.rotate(sim.time * 7);
-    if (art.negroni) ctx.drawImage(art.negroni, -16, -20, 32, 40);
+    ctx.rotate(ang);
+    ctx.globalAlpha = 0.35;
+    if (art.negroni) ctx.drawImage(art.negroni, 18, -14, 26, 32);
+    ctx.globalAlpha = 1;
+    if (art.negroni) ctx.drawImage(art.negroni, -18, -22, 40, 48);
     ctx.restore();
   }
   if (sim.sip <= 0) return;

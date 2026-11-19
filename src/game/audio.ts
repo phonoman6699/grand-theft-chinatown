@@ -319,13 +319,17 @@ function startMusic(kind: MusicKind, restart = false) {
 
 export function startMenuMusic() {
   startMusic("menu");
+  stopCrowd();
 }
 
 export function startLevelMusic(level: 1 | 2 | 3 = 1) {
   startMusic(level === 3 ? "hymn" : level === 2 ? "sun" : "level", true);
+  if (level === 3) startCrowd();
+  else stopCrowd();
 }
 
 export function playSadMusic() {
+  stopCrowd();
   startMusic("sad", true);
 }
 
@@ -344,6 +348,7 @@ export function stopMusic() {
 }
 
 export function playVictory() {
+  stopCrowd();
   stopMusic();
   const line = [
     [67, 71, 74],
@@ -434,4 +439,124 @@ export function fadeWater() {
 
 export function audioContextState(): AudioContextState | "none" {
   return ctxNow()?.state ?? "none";
+}
+
+let crowdOn = false;
+let crowdNear = false;
+let crowdTimer = 0;
+let crowdGain: GainNode | null = null;
+let crowdSrc: AudioBufferSourceNode | null = null;
+let crowdLfo: OscillatorNode | null = null;
+
+function terrace(loud: boolean) {
+  const peak = loud ? 0.045 : 0.02;
+  [0, 150, 300, 520].forEach((at, i) => {
+    window.setTimeout(() => {
+      const freq = i === 3 ? 262 : 196;
+      tone(freq, 0.18, "triangle", peak);
+      tone(freq * 1.25, 0.16, "square", peak * 0.35);
+      noise(0.04, loud ? 0.05 : 0.02, 1600);
+    }, at);
+  });
+}
+
+function crowdTick() {
+  if (!crowdOn) return;
+  if (crowdNear) terrace(true);
+  else if (Math.random() < 0.55) tone(170 + Math.random() * 50, 0.22, "triangle", 0.018);
+  crowdTimer = window.setTimeout(crowdTick, crowdNear ? 2100 : 1700);
+}
+
+export function startCrowd() {
+  try {
+    unlockAudio();
+    const g = graph;
+    if (!g || muted || g.ctx.state === "closed" || crowdOn) return;
+    const seconds = 2;
+    const buffer = g.ctx.createBuffer(1, g.ctx.sampleRate * seconds, g.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = g.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const filter = g.ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 480;
+    filter.Q.value = 0.45;
+    const lfo = g.ctx.createOscillator();
+    lfo.frequency.value = 0.35;
+    const lfoGain = g.ctx.createGain();
+    lfoGain.gain.value = 90;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    const gain = g.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, g.ctx.currentTime);
+    gain.gain.setTargetAtTime(0.02, g.ctx.currentTime, 0.8);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(g.sfx);
+    src.start();
+    lfo.start();
+    crowdSrc = src;
+    crowdGain = gain;
+    crowdLfo = lfo;
+    crowdOn = true;
+    crowdNear = false;
+    crowdTick();
+  } catch {
+    crowdOn = false;
+  }
+}
+
+export function setCrowdNear(on: boolean) {
+  if (!crowdOn) startCrowd();
+  crowdNear = on;
+  const g = graph;
+  if (!crowdGain || !g) return;
+  crowdGain.gain.setTargetAtTime(on ? 0.055 : 0.02, g.ctx.currentTime, 0.15);
+  if (on) terrace(true);
+}
+
+export function playCrowdCheer() {
+  noise(0.45, 0.07, 700);
+  [262, 330, 392, 523].forEach((freq, i) => tone(freq, 0.55, i % 2 ? "triangle" : "square", 0.04));
+  window.setTimeout(() => noise(0.3, 0.04, 1200), 120);
+}
+
+export function playCrowdMiss() {
+  tone(311, 0.28, "sawtooth", 0.04, 140);
+  noise(0.2, 0.03, 500);
+}
+
+export function stopCrowd() {
+  window.clearTimeout(crowdTimer);
+  crowdTimer = 0;
+  crowdOn = false;
+  crowdNear = false;
+  const g = graph;
+  if (crowdGain && g) {
+    try {
+      crowdGain.gain.cancelScheduledValues(g.ctx.currentTime);
+      crowdGain.gain.setTargetAtTime(0.0001, g.ctx.currentTime, 0.2);
+    } catch {
+      /* already fading */
+    }
+  }
+  const src = crowdSrc;
+  const lfo = crowdLfo;
+  crowdSrc = null;
+  crowdGain = null;
+  crowdLfo = null;
+  window.setTimeout(() => {
+    try {
+      src?.stop();
+    } catch {
+      /* already stopped */
+    }
+    try {
+      lfo?.stop();
+    } catch {
+      /* already stopped */
+    }
+  }, 600);
 }
