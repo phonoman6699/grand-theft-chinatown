@@ -135,6 +135,29 @@ export function playGulp() {
   tone(180, 0.16, "sine", 0.16, 110);
 }
 
+export function playBird() {
+  const base = 680 + Math.random() * 160;
+  tone(base, 0.05, "square", 0.055, base * 1.35);
+  window.setTimeout(() => tone(base * 1.45, 0.045, "square", 0.045, base * 0.9), 60);
+  window.setTimeout(() => tone(base * 0.75, 0.08, "square", 0.04, base * 0.5), 120);
+}
+
+export function playPizzoVoice() {
+  const hops = 3 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < hops; i++) {
+    const freq = 480 + Math.random() * 260;
+    window.setTimeout(() => tone(freq, 0.045, "square", 0.045, freq * 0.82), i * 68);
+  }
+}
+
+export function playMarcoVoice() {
+  const hops = 2 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < hops; i++) {
+    const freq = 150 + Math.random() * 80;
+    window.setTimeout(() => tone(freq, 0.07, "triangle", 0.06, freq * 0.72), i * 95);
+  }
+}
+
 export function playBark() {
   noise(0.07, 0.07, 380);
   tone(190, 0.08, "square", 0.07, 110);
@@ -205,9 +228,10 @@ export function stopRain() {
   rainOn = false;
 }
 
-type MusicKind = "menu" | "level" | "sun" | "hymn" | "sad";
+type MusicKind = "menu" | "level" | "sun" | "hymn" | "sad" | "scene";
 
 let musicKind: MusicKind | null = null;
+let menuWanted = false;
 let musicTimer = 0;
 let musicStep = 0;
 let musicRush = false;
@@ -245,6 +269,16 @@ const SAD_PHRASES = [
   [60, 57, 55, 52, 50, 48, 47, 0],
   [67, 64, 62, 59, 55, 52, 48, 0],
   [62, 60, 57, 55, 52, 50, 47, 48],
+];
+const SCENE_PHRASES = [
+  [67, 0, 70, 74, 0, 77, 74, 70, 67, 70, 0, 74, 65, 67, 70, 67],
+  [62, 65, 0, 69, 72, 0, 69, 65, 62, 0, 65, 69, 72, 74, 72, 69],
+  [70, 74, 77, 0, 81, 77, 74, 70, 0, 74, 77, 81, 0, 77, 74, 70],
+  [60, 0, 64, 67, 72, 67, 64, 0, 62, 64, 67, 0, 72, 70, 67, 64],
+  [74, 77, 74, 70, 0, 67, 70, 74, 77, 81, 0, 77, 74, 70, 67, 0],
+  [65, 69, 72, 0, 76, 72, 69, 65, 0, 69, 72, 76, 79, 76, 72, 69],
+  [67, 0, 0, 74, 70, 67, 74, 77, 0, 81, 77, 74, 70, 67, 65, 67],
+  [72, 70, 67, 0, 65, 67, 70, 74, 0, 77, 74, 70, 67, 0, 70, 67],
 ];
 const RUSH_PHRASES = [
   [79, 84, 88, 84, 81, 88, 86, 79, 84, 88, 91, 88],
@@ -287,21 +321,24 @@ function musicTick() {
           ? RUSH_PHRASES
         : musicKind === "hymn"
           ? HYMN_PHRASES
+        : musicKind === "scene"
+          ? SCENE_PHRASES
           : musicKind === "sun"
             ? SUN_PHRASES
             : LEVEL_PHRASES;
   const width = phrases[0]?.length ?? 8;
   const phrase = phrases[Math.floor(musicStep / width) % phrases.length] ?? [];
   const note = phrase[musicStep % width] ?? 0;
-  const tempo = musicKind === "menu" ? 300 : musicKind === "sad" ? 460 : musicRush ? 92 : musicKind === "hymn" ? 190 : musicKind === "sun" ? 146 : 168;
-  const dur = musicKind === "menu" ? 0.24 : musicKind === "sad" ? 0.38 : musicRush ? 0.07 : musicKind === "sun" ? 0.12 : 0.13;
-  const peak = musicKind === "menu" ? 0.045 : musicKind === "sad" ? 0.04 : musicRush ? 0.05 : 0.042;
-  const voice = musicKind === "level" ? "square" : "triangle";
+  const tempo = musicKind === "menu" ? 300 : musicKind === "sad" ? 460 : musicKind === "scene" ? 250 : musicRush ? 92 : musicKind === "hymn" ? 190 : musicKind === "sun" ? 146 : 168;
+  const dur = musicKind === "menu" ? 0.24 : musicKind === "sad" ? 0.38 : musicKind === "scene" ? 0.2 : musicRush ? 0.07 : musicKind === "sun" ? 0.12 : 0.13;
+  const peak = musicKind === "menu" ? 0.045 : musicKind === "sad" ? 0.04 : musicKind === "scene" ? 0.04 : musicRush ? 0.05 : 0.042;
+  const voice = musicKind === "level" || musicKind === "scene" ? "square" : "triangle";
   musicNote(note, dur, peak, voice);
-  if (musicKind === "level" || musicKind === "sun" || musicKind === "hymn") {
+  if ((musicKind === "level" || musicKind === "sun" || musicKind === "hymn") && musicKind !== "scene") {
     const bass = (note || 72) - (musicRush ? 12 : 24);
     if (musicStep % (musicRush ? 2 : 4) === 0) musicNote(bass, dur, 0.03, "square");
   }
+  if (musicKind === "scene" && note && musicStep % 8 === 0) musicNote(note - 12, 0.42, 0.026, "triangle");
   if (musicKind === "menu" && musicStep % 8 === 0) musicNote((note || 57) - 12, 0.3, 0.028, "square");
   musicStep += 1;
   musicTimer = window.setTimeout(musicTick, tempo);
@@ -309,6 +346,7 @@ function musicTick() {
 
 function startMusic(kind: MusicKind, restart = false) {
   unlockAudio();
+  menuWanted = kind === "menu";
   if (musicKind === kind && !restart) return;
   stopMusic();
   musicKind = kind;
@@ -318,14 +356,32 @@ function startMusic(kind: MusicKind, restart = false) {
 }
 
 export function startMenuMusic() {
-  startMusic("menu");
+  unlockAudio();
+  menuWanted = true;
   stopCrowd();
+  const begin = () => {
+    if (!menuWanted || musicKind === "menu") return;
+    startMusic("menu");
+  };
+  const ctx = graph?.ctx;
+  if (ctx && ctx.state === "suspended") {
+    void ctx.resume().then(begin);
+    return;
+  }
+  begin();
 }
 
 export function startLevelMusic(level: 1 | 2 | 3 = 1) {
+  if (level !== 1) stopRain();
   startMusic(level === 3 ? "hymn" : level === 2 ? "sun" : "level", true);
   if (level === 3) startCrowd();
   else stopCrowd();
+}
+
+export function startCutsceneMusic() {
+  stopRain();
+  stopCrowd();
+  startMusic("scene", true);
 }
 
 export function playSadMusic() {

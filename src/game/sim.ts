@@ -47,6 +47,7 @@ export type Bird = {
   hold: number;
   fly: number;
   live: boolean;
+  cried: boolean;
   salvo: number;
   pause: number;
   approach: number;
@@ -343,6 +344,7 @@ function spawnBirds(sim: Sim, horizon: number) {
       hold: pause,
       fly: rand(sim) * 6,
       live: false,
+      cried: false,
       salvo: rand(sim) < 0.4 ? 2 : 1,
       pause,
       approach: 220 + rand(sim) * 340,

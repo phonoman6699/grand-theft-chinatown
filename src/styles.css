@@ -111,12 +111,260 @@ button:focus-visible {
   box-shadow: 0 2px 0 #000;
 }
 
+.sprite-cheer {
+  animation: sprite-cheer 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sprite-cheer {
+  0% {
+    transform: translateY(16px) scale(0.94);
+  }
+  45% {
+    transform: translateY(-28px) scale(1.06);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pizzo-to-pond {
+  left: -18%;
+  animation: pizzo-to-pond 3.6s linear forwards;
+}
+
+@keyframes pizzo-to-pond {
+  to {
+    left: 40%;
+  }
+}
+
+.strip-6,
+.strip-2 {
+  display: flex;
+  height: 100%;
+}
+
+.strip-6 {
+  animation: strip-6 0.72s steps(6) infinite;
+}
+
+.strip-2 {
+  animation: strip-2 0.5s steps(2) infinite;
+}
+
+@keyframes strip-6 {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes strip-2 {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.pizzo-leave {
+  left: 32%;
+  animation: pizzo-leave 2.6s linear forwards;
+}
+
+@keyframes pizzo-leave {
+  to {
+    left: 112%;
+  }
+}
+
+.marco-bleah {
+  animation: marco-bleah 0.7s ease-in-out;
+}
+
+@keyframes marco-bleah {
+  0% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-4deg);
+  }
+  70% {
+    transform: rotate(3deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.negroni-pass {
+  left: 36%;
+  bottom: 30%;
+  animation: negroni-pass 1.15s ease-in-out forwards;
+}
+
+.negroni-held {
+  left: 53%;
+  bottom: 31%;
+}
+
+@keyframes negroni-pass {
+  0% {
+    left: 36%;
+    bottom: 30%;
+    transform: rotate(-12deg);
+  }
+  42% {
+    left: 45%;
+    bottom: 46%;
+    transform: rotate(8deg);
+  }
+  100% {
+    left: 53%;
+    bottom: 31%;
+    transform: rotate(0deg);
+  }
+}
+
+.sheet-6 {
+  animation: sheet-play 0.72s steps(6) infinite;
+}
+
+.sheet-2 {
+  animation: sheet-play 0.5s steps(2) infinite;
+}
+
+@keyframes sheet-play {
+  to {
+    background-position-x: var(--end);
+  }
+}
+
+.pizzo-walk {
+  left: 2%;
+  animation: pizzo-walk 4.8s linear forwards;
+}
+
+@keyframes pizzo-walk {
+  to {
+    left: 32%;
+  }
+}
+
+.frame-cycle > img {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: frame-fade 1.12s infinite;
+}
+
+.frame-cycle > img:nth-child(2) {
+  animation-delay: 0.28s;
+}
+
+.frame-cycle > img:nth-child(3) {
+  animation-delay: 0.56s;
+}
+
+.frame-cycle > img:nth-child(4) {
+  animation-delay: 0.84s;
+}
+
+@keyframes frame-fade {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 1;
+  }
+  36% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.frame-cycle.two > img {
+  animation-name: frame-fade-2;
+  animation-duration: 0.8s;
+}
+
+.frame-cycle.two > img:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+@keyframes frame-fade-2 {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.talk-head {
+  animation: talk-head 0.32s ease-in-out infinite;
+}
+
+@keyframes talk-head {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+.cut-walk {
+  animation: cut-walk 3.6s ease-in-out forwards;
+}
+
+.cut-bob {
+  animation: cut-bob 0.32s ease-in-out infinite;
+}
+
+@keyframes cut-walk {
+  from {
+    transform: translateX(-80vw);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes cut-bob {
+  50% {
+    translate: 0 -8px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu-pick,
   .menu-pick:hover:not(:disabled),
   .menu-pick:focus-visible:not(:disabled),
-  .menu-pick:active:not(:disabled) {
+  .menu-pick:active:not(:disabled),
+  .sprite-cheer,
+  .cut-walk,
+  .cut-bob,
+  .pizzo-to-pond,
+  .pizzo-walk,
+  .talk-head,
+  .frame-cycle > img {
     transition: none;
     transform: none;
+    animation: none;
+    opacity: 1;
   }
 }

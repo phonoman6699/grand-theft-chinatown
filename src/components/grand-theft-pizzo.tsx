@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Lock, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Pause, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import {
   isMuted,
   playBark,
+  playBird,
+  playPizzoVoice,
+  playMarcoVoice,
   playBuff,
   playGulp,
   playJump,
@@ -17,6 +20,7 @@ import {
   setMuted,
   fadeWater,
   startLevelMusic,
+  startCutsceneMusic,
   startMenuMusic,
   startWater,
   setMusicRush,
@@ -24,10 +28,24 @@ import {
   playCrowdCheer,
   playCrowdMiss,
   stopMusic,
+  stopCrowd,
   stopRain,
   unlockAudio,
 } from "@/game/audio";
+import { MARCO_LINES } from "@/game/marco-lines";
 import { drawWorld, type Art } from "@/game/render";
+import pw1 from "@/assets/sprites/pw-1.png";
+import pw2 from "@/assets/sprites/pw-2.png";
+import pw3 from "@/assets/sprites/pw-3.png";
+import pw4 from "@/assets/sprites/pw-4.png";
+import pw5 from "@/assets/sprites/pw-5.png";
+import pw6 from "@/assets/sprites/pw-6.png";
+import pt1 from "@/assets/sprites/pt-1.png";
+import pt2 from "@/assets/sprites/pt-2.png";
+import mt1 from "@/assets/sprites/mt-1.png";
+import mt2 from "@/assets/sprites/mt-2.png";
+import marcoBleah from "@/assets/sprites/marco-bleah.png";
+import parkSrc from "@/assets/park-pond.jpg";
 import { BEST_KEY, FINISH_X, GROUND, VIEW_H, VIEW_W, answerQuiz, createSim, metersOf, step, type Sim } from "@/game/sim";
 import run1 from "@/assets/sprites/run-1.png";
 import run2 from "@/assets/sprites/run-2.png";
@@ -37,9 +55,6 @@ import jump1 from "@/assets/sprites/jump-1.png";
 import jump2 from "@/assets/sprites/jump-2.png";
 import jump3 from "@/assets/sprites/jump-3.png";
 import jump4 from "@/assets/sprites/jump-4.png";
-import pizzoPortrait from "@/assets/sprites/pizzo-portrait.png";
-import ioaPortrait from "@/assets/sprites/ioa-portrait.png";
-import capitanoPortrait from "@/assets/sprites/capitano-portrait.png";
 import cigarSrc from "@/assets/sprites/pizzo-cigar.png";
 import finale1 from "@/assets/sprites/finale-1.png";
 import finale2 from "@/assets/sprites/finale-2.png";
@@ -84,6 +99,7 @@ import fanWomanSrc from "@/assets/sprites/crowd-2.png";
 import fanKidSrc from "@/assets/sprites/crowd-3.png";
 import fanBearerSrc from "@/assets/sprites/crowd-4.png";
 import castleSrc from "@/assets/sprites/castle.png";
+import portaSrc from "@/assets/sprites/porta-napoli.png";
 
 const RUN_SRC = [run1, run2, run3, run4];
 const JUMP_SRC = [jump1, jump2, jump3, jump4];
@@ -121,7 +137,7 @@ function writeBest(n: number) {
 }
 
 export function GrandTheftPizzo() {
-  const [screen, setScreen] = useState<"select" | "run">("select");
+  const [screen, setScreen] = useState<"select" | "run" | "cutscene">("select");
   const [startLevel, setStartLevel] = useState<1 | 2 | 3>(1);
   const [tester, setTester] = useState(false);
   const [ready, setReady] = useState(false);
@@ -153,13 +169,14 @@ export function GrandTheftPizzo() {
     fans: [],
     napoliFlag: null,
     castle: null,
+    porta: null,
   });
 
   useEffect(() => {
     setBest(readBest());
     let cancel = false;
     Promise.all(
-      [...RUN_SRC, ...JUMP_SRC, cigarSrc, ...BUFF_RUN_SRC, ...BUFF_JUMP_SRC, drinkSrc, ...FINALE_SRC, ...LANDMARK_SRC, ...TREE_SRC, ...FAN_SRC, castleSrc].map(loadImage),
+      [...RUN_SRC, ...JUMP_SRC, cigarSrc, ...BUFF_RUN_SRC, ...BUFF_JUMP_SRC, drinkSrc, ...FINALE_SRC, ...LANDMARK_SRC, ...TREE_SRC, ...FAN_SRC, castleSrc, portaSrc].map(loadImage),
     )
       .then((imgs) => {
         if (cancel) return;
@@ -189,6 +206,7 @@ export function GrandTheftPizzo() {
           fans: imgs.slice(46, 50),
           napoliFlag: null,
           castle: imgs[50] ?? null,
+          porta: imgs[51] ?? null,
         };
         setReady(true);
       })
@@ -205,6 +223,7 @@ export function GrandTheftPizzo() {
 
   useEffect(() => {
     if (screen !== "select") return;
+    startMenuMusic();
     const kick = () => startMenuMusic();
     window.addEventListener("pointerdown", kick);
     return () => window.removeEventListener("pointerdown", kick);
@@ -227,8 +246,21 @@ export function GrandTheftPizzo() {
         setStartLevel(level);
         setScreen("run");
       }}
+      onCutscene={() => {
+        unlockAudio();
+        stopMusic();
+        stopCrowd();
+        setScreen("cutscene");
+      }}
       tester={tester}
       onTester={() => setTester(true)}
+    />
+  ) : screen === "cutscene" ? (
+    <PondCutscene
+      onExit={() => {
+        setScreen("select");
+        startMenuMusic();
+      }}
     />
   ) : (
     <Runner
@@ -245,16 +277,21 @@ export function GrandTheftPizzo() {
         setScreen("select");
         startMenuMusic();
       }}
+      onCutscene={() => {
+        stopMusic();
+        stopCrowd();
+        setScreen("cutscene");
+      }}
     />
   );
 }
 
 function SelectScreen({
-  best,
   ready,
   muted,
   onMute,
   onPlay,
+  onCutscene,
   tester,
   onTester,
 }: {
@@ -263,6 +300,7 @@ function SelectScreen({
   muted: boolean;
   onMute: () => void;
   onPlay: (level: 1 | 2 | 3) => void;
+  onCutscene: () => void;
   tester: boolean;
   onTester: () => void;
 }) {
@@ -283,150 +321,94 @@ function SelectScreen({
   }
 
   return (
-    <main className="min-h-dvh bg-[#090b0e]">
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-3 h-1 w-14 bg-[#f2c14e]" />
-            <div className="flex items-center gap-4 sm:gap-6">
-              <h1 className="font-display text-[clamp(3.4rem,9vw,7.2rem)] leading-[0.8] tracking-wide text-fg">
-                GRAND
-                <br />
-                THEFT
-                <br />
-                CHINATOWN
-              </h1>
-              <button
-                type="button"
-                className="shrink-0"
-                onClick={() => {
-                  setAskPin(true);
-                  setPin("");
-                  setPinBad(false);
-                }}
-                aria-label="PIN tester"
-              >
-                <img src={logo} alt="" className="size-24 sm:size-36" />
-              </button>
-            </div>
-            {tester ? <p className="mt-3 text-xs tracking-[0.2em] text-[#f2c14e] uppercase">Tester</p> : null}
-          </div>
+    <main className="relative flex min-h-dvh flex-col items-center justify-center bg-[#090b0e] px-6">
+      <button
+        type="button"
+        className="menu-pick absolute top-4 right-4 inline-flex size-11 items-center justify-center rounded-md border border-line bg-surface text-fg"
+        onClick={onMute}
+        aria-label={muted ? "Attiva suono" : "Disattiva suono"}
+        aria-pressed={muted}
+      >
+        {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
+      </button>
+      <div className="flex items-center gap-5 sm:gap-8">
+        <h1 className="font-display text-[clamp(3rem,8vw,6rem)] leading-[0.82] tracking-wide text-fg">
+          Chinatown
+          <br />
+          stories
+        </h1>
+        <button
+          type="button"
+          className="shrink-0"
+          onClick={() => {
+            setAskPin(true);
+            setPin("");
+            setPinBad(false);
+          }}
+          aria-label="PIN tester"
+        >
+          <img src={logo} alt="" className="size-24 sm:size-36" />
+        </button>
+      </div>
+      <p className="mt-4 text-xs tracking-[0.28em] text-[#f2c14e] uppercase">Alpha version</p>
+      <button
+        type="button"
+        className="menu-pick mt-12 inline-flex min-h-12 min-w-40 items-center justify-center rounded-md bg-[#f2c14e] px-8 text-sm font-medium tracking-[0.2em] text-black uppercase disabled:opacity-40"
+        onClick={() => onPlay(1)}
+        disabled={!ready}
+      >
+        Play
+      </button>
+      {tester ? (
+        <div className="mt-8 flex w-full max-w-xs flex-col gap-2">
+          {([1, 2, 3] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              className="menu-pick h-11 rounded-md border border-[#f2c14e]/70 text-sm tracking-[0.16em] text-[#f2c14e] uppercase disabled:opacity-40"
+              onClick={() => onPlay(level)}
+              disabled={!ready}
+            >
+              Livello {level}
+            </button>
+          ))}
           <button
             type="button"
-            className="menu-pick inline-flex size-11 items-center justify-center rounded-md border border-line bg-surface text-fg"
-            onClick={onMute}
-            aria-label={muted ? "Attiva suono" : "Disattiva suono"}
-            aria-pressed={muted}
+            className="menu-pick h-11 rounded-md border border-[#f2c14e]/70 text-sm tracking-[0.16em] text-[#f2c14e] uppercase"
+            onClick={onCutscene}
           >
-            {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
+            Cutscene
           </button>
-        </header>
-
-        {askPin && !tester ? (
-          <form
-            onSubmit={submitPin}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
-          >
-            <div className="w-full max-w-xs rounded-md border border-[#f2c14e]/70 bg-[#090b0e] p-5">
-              <p className="font-display text-3xl tracking-wide">PIN</p>
-              <input
-                value={pin}
-                onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
-                  setPinBad(false);
-                }}
-                inputMode="numeric"
-                autoComplete="off"
-                autoFocus
-                aria-label="PIN"
-                className="mt-4 h-12 w-full rounded-md border border-line bg-black px-3 text-center text-xl tracking-[0.4em] text-fg outline-none"
-              />
-              {pinBad ? <p className="mt-2 text-sm text-[#f2c14e]">No</p> : null}
-              <div className="mt-4 flex gap-2">
-                <button type="submit" className="menu-pick h-11 flex-1 rounded-md bg-[#f2c14e] text-sm font-medium text-black">
-                  Entra
-                </button>
-                <button
-                  type="button"
-                  className="menu-pick h-11 rounded-md border border-line px-4 text-sm"
-                  onClick={() => setAskPin(false)}
-                >
-                  Chiudi
-                </button>
-              </div>
+        </div>
+      ) : null}
+      {askPin && !tester ? (
+        <form onSubmit={submitPin} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-xs rounded-md border border-[#f2c14e]/70 bg-[#090b0e] p-5">
+            <p className="font-display text-3xl tracking-wide">PIN</p>
+            <input
+              value={pin}
+              onChange={(event) => {
+                setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                setPinBad(false);
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              aria-label="PIN"
+              className="mt-4 h-12 w-full rounded-md border border-line bg-black px-3 text-center text-xl tracking-[0.4em] text-fg outline-none"
+            />
+            {pinBad ? <p className="mt-2 text-sm text-[#f2c14e]">No</p> : null}
+            <div className="mt-4 flex gap-2">
+              <button type="submit" className="menu-pick h-11 flex-1 rounded-md bg-[#f2c14e] text-sm font-medium text-black">
+                Entra
+              </button>
+              <button type="button" className="menu-pick h-11 rounded-md border border-line px-4 text-sm" onClick={() => setAskPin(false)}>
+                Chiudi
+              </button>
             </div>
-          </form>
-        ) : null}
-
-        <section className="grid gap-3 sm:grid-cols-3" aria-label="Personaggi">
-          <article className="flex flex-col overflow-hidden rounded-md border border-[#f2c14e]/70 bg-black">
-            <div className="overflow-hidden bg-raised">
-              <img src={pizzoPortrait} alt="Pizzo" className="aspect-[3/4] w-full object-cover object-top" />
-            </div>
-            <div className="flex flex-1 flex-col p-4">
-              <h2 className="font-display text-4xl tracking-wide">Pizzo</h2>
-              <div className="mt-3 text-xs tracking-[0.14em] text-fg uppercase">
-                <p className="text-subtle">Keys</p>
-                <p className="mt-1">Spacebar or W — Jump</p>
-                <p>Special move — Q</p>
-              </div>
-              {tester ? (
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {([1, 2, 3] as const).map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      className="menu-pick inline-flex min-h-11 items-center justify-center rounded-md bg-[#f2c14e] px-2 text-sm font-medium text-black disabled:opacity-40"
-                      onClick={() => onPlay(level)}
-                      disabled={!ready}
-                    >
-                      Liv. {level}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="menu-pick mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f2c14e] px-4 text-sm font-medium text-black disabled:opacity-40"
-                  onClick={() => onPlay(1)}
-                  disabled={!ready}
-                >
-                  <Play className="size-4" aria-hidden />
-                  {ready ? "Gioca" : "Carico"}
-                </button>
-              )}
-            </div>
-          </article>
-
-          <article className="flex flex-col overflow-hidden rounded-md border border-white/10 bg-black" aria-disabled="true">
-            <div className="relative overflow-hidden bg-raised">
-              <img src={ioaPortrait} alt="Ioa" className="aspect-[3/4] w-full object-cover object-top" />
-              <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-sm bg-black/75 px-2 py-1 text-xs tracking-wider text-fg uppercase">
-                <Lock className="size-3.5" aria-hidden />
-                Bloccato
-              </span>
-            </div>
-            <div className="p-4">
-              <h2 className="font-display text-4xl tracking-wide text-muted">Ioa</h2>
-            </div>
-          </article>
-
-          <article className="flex flex-col overflow-hidden rounded-md border border-white/10 bg-black" aria-disabled="true">
-            <div className="relative overflow-hidden bg-raised">
-              <img src={capitanoPortrait} alt="Capitano" className="aspect-[3/4] w-full object-cover object-top" />
-              <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-sm bg-black/75 px-2 py-1 text-xs tracking-wider text-fg uppercase">
-                <Lock className="size-3.5" aria-hidden />
-                Bloccato
-              </span>
-            </div>
-            <div className="p-4">
-              <h2 className="font-display text-4xl tracking-wide text-muted">Capitano</h2>
-            </div>
-          </article>
-        </section>
-
-        <p className="text-xs tracking-[0.16em] text-subtle uppercase">Record {best} metri</p>
-      </div>
+          </div>
+        </form>
+      ) : null}
     </main>
   );
 }
@@ -438,6 +420,7 @@ function Runner({
   onMute,
   onBest,
   onExit,
+  onCutscene,
   startLevel,
 }: {
   art: Art;
@@ -446,6 +429,7 @@ function Runner({
   onMute: () => void;
   onBest: (n: number) => void;
   onExit: () => void;
+  onCutscene: () => void;
   startLevel: 1 | 2 | 3;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -477,12 +461,15 @@ function Runner({
   const [level, setLevel] = useState<1 | 2 | 3>(startLevel);
   const bestRef = useRef(best);
   const onBestRef = useRef(onBest);
+  const onCutsceneRef = useRef(onCutscene);
   bestRef.current = best;
   onBestRef.current = onBest;
+  onCutsceneRef.current = onCutscene;
 
   useEffect(() => {
     startLevelMusic(startLevel);
     if (startLevel === 1) startWater();
+    else stopRain();
     return () => stopRain();
   }, []);
 
@@ -594,6 +581,12 @@ function Runner({
           if (prevPump === "on" && sim.pump !== "on") setMusicRush(false);
           prevPump = sim.pump;
           if (sim.pump !== "off") creatineRef.current = false;
+          for (const bird of sim.birds) {
+            if (bird.live && !bird.cried) {
+              bird.cried = true;
+              playBird();
+            }
+          }
           for (const dog of sim.dogs) {
             if (!dog.barked && dog.x < sim.x + 460 && dog.x > sim.x - 20) {
               dog.barked = true;
@@ -625,6 +618,10 @@ function Runner({
             if (simRef.current !== finished) return;
             const m = metersOf(finished);
             if (m > bestRef.current) onBestRef.current(m);
+            if (finished.level === 3) {
+              onCutsceneRef.current();
+              return;
+            }
             setOver(m);
             setEnding("cigar");
           }, 5200);
@@ -792,7 +789,6 @@ function Runner({
     <main className="flex h-dvh flex-col bg-bg">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div>
-          <p className="font-display text-lg leading-none tracking-wide sm:text-2xl">GRAND THEFT CHINATOWN</p>
           <p className="text-lg font-medium tabular-nums">
             <span ref={metersRef}>0</span>
             <span className="ml-1 text-sm font-normal text-muted">metri</span>
@@ -949,22 +945,168 @@ function Runner({
                 Livello {level + 1}
               </button>
             ) : (
-              <button type="button" className="btn-primary" onClick={retry}>
-                <RotateCcw className="size-4" aria-hidden />
-                Di nuovo
+              <button type="button" className="btn-primary" onClick={onCutscene}>
+                Parco del Sole
               </button>
             )}
             {level < 3 ? (
               <button type="button" className="btn-ghost" onClick={retry}>
                 Ripeti il livello {level}
               </button>
-            ) : null}
+            ) : (
+              <button type="button" className="btn-ghost" onClick={retry}>
+                <RotateCcw className="size-4" aria-hidden />
+                Di nuovo
+              </button>
+            )}
             <button type="button" className="btn-ghost" onClick={onExit}>
               Personaggi
             </button>
           </Overlay>
         ) : null}
       </div>
+    </main>
+  );
+}
+
+function Reel({ frames, play, height, width }: { frames: string[]; play: boolean; height: number; width: number }) {
+  const two = frames.length === 2;
+  return (
+    <div className="overflow-hidden" style={{ height, width }}>
+      <div
+        className={play ? (two ? "strip-2" : "strip-6") : "flex h-full"}
+        style={{ width: frames.length * width, height }}
+      >
+        {frames.map((src, index) => (
+          <img key={src + index} src={src} alt="" className="h-full object-contain object-bottom" style={{ width }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PondCutscene({ onExit }: { onExit: () => void }) {
+  const [arrived, setArrived] = useState(false);
+  const [turned, setTurned] = useState(false);
+  const [line, setLine] = useState(0);
+  const [beat, setBeat] = useState<"talk" | "pass" | "leave" | "bleah" | "end">("talk");
+  useEffect(() => {
+    if (!arrived) return;
+    const id = window.setTimeout(() => setTurned(true), 900);
+    return () => window.clearTimeout(id);
+  }, [arrived]);
+  useEffect(() => {
+    startCutsceneMusic();
+  }, []);
+  useEffect(() => {
+    if (!turned || beat !== "talk") return;
+    const spoken = MARCO_LINES[line];
+    if (!spoken) return;
+    if (spoken.who === "Pizzo") playPizzoVoice();
+    else playMarcoVoice();
+  }, [turned, beat, line]);
+  useEffect(() => {
+    if (beat === "bleah") playMarcoVoice();
+  }, [beat]);
+  useEffect(() => {
+    if (beat === "pass") {
+      const id = window.setTimeout(() => setBeat("leave"), 1200);
+      return () => window.clearTimeout(id);
+    }
+    if (beat === "leave") {
+      const id = window.setTimeout(() => setBeat("bleah"), 2600);
+      return () => window.clearTimeout(id);
+    }
+    return;
+  }, [beat]);
+  const current = MARCO_LINES[line];
+  const talking = beat === "talk" && turned;
+  const pizzoTalking = talking && current?.who === "Pizzo";
+  const marcoTalking = (talking && current?.who === "Marco") || beat === "pass";
+  const leaving = beat === "leave" || beat === "bleah" || beat === "end";
+  const disgusted = beat === "bleah" || beat === "end";
+  const showGlass = beat === "pass" || leaving;
+
+  return (
+    <main className="relative min-h-dvh overflow-hidden bg-black">
+      <img src={parkSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <p className="absolute top-6 left-6 font-display text-5xl tracking-wide text-white drop-shadow">Parco del Sole</p>
+      <div className="absolute bottom-[8%] left-[50%]" style={{ perspective: "900px" }}>
+        <div
+          style={{
+            transform: arrived ? "rotateY(0deg)" : "rotateY(180deg)",
+            transition: "transform 0.9s ease-in-out",
+            transformStyle: "preserve-3d",
+          }}
+        >
+          <div style={{ opacity: disgusted ? 0 : 1, transition: "opacity 0.45s ease" }}>
+            <Reel frames={[mt1, mt2]} play={marcoTalking} height={272} width={120} />
+          </div>
+          <img
+            src={marcoBleah}
+            alt=""
+            className={`absolute bottom-0 left-0 h-[272px] w-auto ${disgusted ? "marco-bleah" : ""}`}
+            style={{ opacity: disgusted ? 1 : 0, transition: "opacity 0.45s ease" }}
+          />
+        </div>
+      </div>
+      <div
+        className={`absolute bottom-[8%] ${!arrived ? "pizzo-walk" : leaving ? "pizzo-leave" : ""}`}
+        style={{ left: arrived && !leaving ? "32%" : undefined, transform: "translateZ(0)" }}
+        onAnimationEnd={(event) => {
+          if (event.animationName === "pizzo-walk") setArrived(true);
+        }}
+      >
+        <div style={{ opacity: turned && !leaving ? 0 : 1, transition: "opacity 0.35s ease" }}>
+          <Reel frames={[pw1, pw2, pw3, pw4, pw5, pw6]} play={!arrived || beat === "leave"} height={256} width={150} />
+        </div>
+        <div className="absolute bottom-0 left-0" style={{ opacity: turned && !leaving ? 1 : 0, transition: "opacity 0.35s ease" }}>
+          <Reel frames={[pt1, pt2]} play={pizzoTalking || beat === "pass"} height={256} width={150} />
+        </div>
+      </div>
+      {showGlass ? (
+        <img
+          src={negroniSrc}
+          alt=""
+          className={`pointer-events-none absolute z-10 h-8 w-auto ${beat === "pass" ? "negroni-pass" : "negroni-held"}`}
+          style={{ opacity: disgusted ? 0 : 1, transition: "opacity 0.45s ease" }}
+        />
+      ) : null}
+      {talking && current ? (
+        <button
+          type="button"
+          className="absolute bottom-6 left-1/2 z-20 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 rounded-md border border-[#f2c14e] px-4 py-3 text-left text-white"
+          style={{ background: "#12151a" }}
+          onClick={() => {
+            if (line + 1 >= MARCO_LINES.length) setBeat("pass");
+            else setLine((n) => n + 1);
+          }}
+        >
+          <p className="text-xs tracking-[0.18em] text-[#f2c14e] uppercase">{current.who}</p>
+          <p className="mt-1 text-lg">{current.text}</p>
+        </button>
+      ) : null}
+      {beat === "bleah" ? (
+        <button
+          type="button"
+          className="absolute bottom-6 left-1/2 z-20 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 rounded-md border border-[#f2c14e] px-4 py-3 text-left text-white"
+          style={{ background: "#12151a" }}
+          onClick={() => setBeat("end")}
+        >
+          <p className="text-xs tracking-[0.18em] text-[#f2c14e] uppercase">Marco</p>
+          <p className="mt-1 text-lg">Bleah</p>
+        </button>
+      ) : null}
+      {beat === "end" ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 px-6">
+          <div className="text-center">
+            <p className="font-display text-5xl tracking-wide text-[#f2c14e] sm:text-6xl">To be continued</p>
+            <button type="button" className="btn-primary mt-8" onClick={onExit}>
+              Menu
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

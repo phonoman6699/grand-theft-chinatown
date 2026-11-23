@@ -26,6 +26,7 @@ export type Art = {
   fans: HTMLImageElement[];
   napoliFlag: HTMLImageElement | null;
   castle: HTMLImageElement | null;
+  porta: HTMLImageElement | null;
 };
 
 type House = { x: number; w: number; h: number; roof: number };
@@ -126,6 +127,7 @@ export function drawWorld(
   if (sim.level === 1) drawCormorants(ctx, sim.time);
 
   drawSampietrini(ctx, cam);
+  if (sim.level === 3) drawPortaNapoli(ctx, cam, art);
 
   drawFinish(ctx, FINISH_X - cam);
 
@@ -299,6 +301,15 @@ function drawPlane(ctx: CanvasRenderingContext2D, x: number, ground: number, sca
   ctx.arc(x - 14 * scale, ground - 70 * scale, 18 * scale, 0, Math.PI * 2);
   ctx.arc(x + 22 * scale, ground - 72 * scale, 16 * scale, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function drawPortaNapoli(ctx: CanvasRenderingContext2D, cam: number, art: Art) {
+  if (!art.porta) return;
+  const h = 250;
+  const w = h * (art.porta.width / art.porta.height);
+  const x = FINISH_X - 700 - cam;
+  if (x > VIEW_W + 20 || x + w < -20) return;
+  ctx.drawImage(art.porta, x, GROUND - h + 8, w, h);
 }
 
 function drawCastle(ctx: CanvasRenderingContext2D, cam: number, art: Art) {
